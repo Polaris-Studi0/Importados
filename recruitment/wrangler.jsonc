@@ -5,10 +5,36 @@
   "compatibility_date": "2026-10-12",
   "workers_dev": true,
   "keep_vars": true,
-  "observability": {"enabled": false},
-  "vars": {"RECRUITMENT_ENABLED":"true","SUPABASE_URL":"https://opeytkcqblgjfyvfjkwe.supabase.co","TURNSTILE_SITE_KEY":"0x4AAAAAAFVAn0Yl8_DHlrg-"},
+  "observability": {
+    "enabled": false
+  },
+  "vars": {
+    "RECRUITMENT_ENABLED": "true",
+    "SUPABASE_URL": "https://opeytkcqblgjfyvfjkwe.supabase.co",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFVAn0Yl8_DHlrg-"
+  },
   "ratelimits": [
-    {"name":"INGRESS_LIMITER","namespace_id":"2026101201","simple":{"limit":30,"period":60}},
-    {"name":"APPLICANT_LIMITER","namespace_id":"2026101202","simple":{"limit":5,"period":60}}
+    {
+      "name": "INGRESS_LIMITER",
+      "namespace_id": "2026101201",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "APPLICANT_LIMITER",
+      "namespace_id": "2026101202",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "api.tiendasimportados.com",
+      "custom_domain": true
+    }
   ]
 }
