@@ -1,0 +1,30 @@
+    <section id="trabaja-con-nosotros" class="careers section-space">
+      <div class="shell careers-grid">
+        <div class="careers-copy reveal">
+          <p class="eyebrow">TU PRÓXIMA PARADA</p>
+          <h2>Lo mejor de Importados.<br><span>También es su gente.</span></h2>
+          <p>¿Te gusta atender con cercanía y hacer que cada visita cuente? Déjanos conocerte.</p>
+          <div class="careers-note"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg><div><strong>Postulación general</strong><p>Recibimos tu perfil para futuros procesos de selección. Enviar tu hoja de vida no garantiza una vacante ni una contratación.</p></div></div>
+          <p class="careers-contact">¿Necesitas ayuda con tu postulación?<br><a href="mailto:Importados@polaris-studio.tech">Importados@polaris-studio.tech</a></p>
+        </div>
+        <div class="careers-panel reveal">
+          <div class="careers-panel-top"><span>TRABAJA CON NOSOTROS</span><span aria-hidden="true">✦</span></div>
+          <h3>Cuéntanos de ti.</h3>
+          <p id="careers-availability" role="status">Estamos preparando la recepción de hojas de vida. Por ahora, puedes enviarla a nuestro correo.</p>
+          <form id="careers-form" enctype="multipart/form-data" aria-describedby="careers-availability">
+            <fieldset id="careers-fields" disabled>
+              <label>Nombre completo<input name="name" autocomplete="name" maxlength="120" required placeholder="Tu nombre"></label>
+              <div class="careers-fields-grid"><label>Correo electrónico<input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="nombre@correo.com"></label><label>Celular<input name="phone" type="tel" autocomplete="tel" maxlength="20" required placeholder="300 123 4567"></label></div>
+              <label>¿En qué sede te gustaría trabajar?<select name="branch" required><option value="">Elige una opción</option><option value="santa-lucia">Santa Lucía · Medellín</option><option value="niquia">Niquía · Bello</option><option value="cualquiera">Cualquiera de las dos</option></select></label>
+              <label class="cv-upload">Tu hoja de vida en PDF<span>Máximo 5 MB. Evita incluir datos de salud, documentos de identidad o información bancaria.</span><input id="cv-file" name="cv" type="file" accept="application/pdf,.pdf" required aria-describedby="cv-file-info"><span id="cv-file-info">Selecciona un archivo PDF.</span></label>
+              <label class="consent-label"><input name="consent" type="checkbox" required><span>Autorizo a Importados a usar mis datos y mi hoja de vida para procesos de selección, de acuerdo con el <a href="#privacidad-postulaciones">aviso de privacidad</a>.</span></label>
+              <div id="careers-verification"></div>
+              <button id="careers-submit" class="button button-dark" type="submit">Enviar mi hoja de vida <svg class="icon" aria-hidden="true"><use href="#i-down"/></svg></button>
+            </fieldset>
+            <p id="careers-feedback" role="status" hidden></p>
+          </form>
+          <noscript><p>Para usar el formulario, activa JavaScript. También puedes enviar tu hoja de vida a <a href="mailto:Importados@polaris-studio.tech">Importados@polaris-studio.tech</a>.</p></noscript>
+          <details id="privacidad-postulaciones" class="careers-privacy"><summary>Cómo cuidamos tus datos</summary><p>Importados usará tu nombre, datos de contacto, preferencia de sede y hoja de vida únicamente para evaluar tu postulación y contactarte en procesos de selección. El envío es voluntario y no garantiza contratación.</p><p>Los archivos se guardan en un espacio privado en Supabase. El servicio de recepción usa Cloudflare para verificar los envíos. Tu hoja de vida no se publica en la web ni se usa para publicidad.</p><p>Puedes solicitar información, corrección o eliminación de tus datos en <a href="mailto:Importados@polaris-studio.tech">Importados@polaris-studio.tech</a>. No adjuntes información sensible que no sea necesaria para presentar tu experiencia laboral.</p></details>
+        </div>
+      </div>
+    </section>
