@@ -21,6 +21,8 @@ export async function receiveApplication(request,env,origin){
   const form=await boundedBody(request);
   const name=field(form,'name',120),email=field(form,'email',254).toLowerCase(),phone=field(form,'phone',20),branch=field(form,'branch',20),id=field(form,'request_id',36);
   if(name.length<2||!/^\S+@[^\s@]+\.[^\s@]+$/.test(email)||!/^[+\d()\s-]{7,20}$/.test(phone)||phone.replace(/\D/g,'').length<7||!['santa-lucia','niquia','cualquiera'].includes(branch)||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))fail(400,'Revisa tu nombre, correo, celular y sede.');
+  const vacancyId=form.get('vacancy_id')||null;
+  if(vacancyId&&(typeof vacancyId!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(vacancyId)))fail(400,'Selecciona una vacante válida.');
   if(form.get('consent')!=='on')fail(400,'Necesitamos tu autorización para recibir la postulación.');
   const token=field(form,'cf-turnstile-response',2048);
   const cv=form.get('cv');if(!cv||typeof cv==='string'||!cv.size)fail(400,'Selecciona tu hoja de vida en PDF.');
@@ -32,12 +34,31 @@ export async function receiveApplication(request,env,origin){
   if(!verification.ok)fail(503,'No pudimos verificar el envío. Intenta de nuevo.');
   const validated=await verification.json();if(!validated.success||validated.action!=='recruitment'||validated.hostname!==new URL(origin).hostname)fail(400,'La verificación venció o no es válida. Completa la verificación de nuevo.');
   if(env.APPLICANT_LIMITER){const {success}=await env.APPLICANT_LIMITER.limit({key:await hash(email)});if(!success)fail(429,'Espera un minuto antes de enviar otra postulación.');}
-  const payloadHash=await hash(JSON.stringify([name,email,phone,branch,await hash(bytes),CONSENT_VERSION]));
-  const path=id+'.pdf',receipt='IMP-'+id.replaceAll('-','').slice(0,12).toUpperCase();
-  const row={id,receipt,name,email,phone,branch,object_path:path,file_size:cv.size,payload_hash:payloadHash,consent_version:CONSENT_VERSION};
-  const insert=await rest(env,'job_applications',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(row)});
-  if(insert.status===409){const previous=await rest(env,'job_applications?id=eq.'+id+'&select=receipt,payload_hash,status');if(!previous.ok)fail(503,'No pudimos confirmar tu postulación. Escríbenos al correo de selección.');const [existing]=await previous.json();if(existing?.payload_hash===payloadHash&&existing.status==='received')return json({ok:true,receipt:existing.receipt},200,origin);if(existing?.payload_hash!==payloadHash)fail(409,'Este intento no corresponde a los mismos datos. Recarga la página antes de enviar una nueva postulación.');}
-  if(!insert.ok&&insert.status!==409)fail(503,'No pudimos registrar tu postulación. Intenta de nuevo más tarde.');
+  const payloadHash=await hash(JSON.stringify([name,email,phone,branch,await hash(bytes),CONSENT_VERSION,...(vacancyId?[vacancyId]:[])]));
+  let existingApplication=null;
+  if(vacancyId){
+    // Reconfirm or complete the original attempt even if its vacancy has since
+    // closed. No receipt or file is reused without the exact verified payload.
+    const previous=await rest(env,'job_applications?id=eq.'+id+'&select=receipt,payload_hash,status');
+    if(!previous.ok)fail(503,'No pudimos confirmar tu postulación. Vuelve a intentar con los mismos datos.');
+    [existingApplication]=await previous.json();
+    if(existingApplication){
+      if(existingApplication.payload_hash!==payloadHash)fail(409,'Este intento no corresponde a los mismos datos. Recarga la página antes de enviar una nueva postulación.');
+      if(existingApplication.status==='received')return json({ok:true,receipt:existingApplication.receipt},200,origin);
+      if(existingApplication.status!=='uploading')fail(503,'No pudimos confirmar tu postulación. Escríbenos al correo de selección.');
+    }else{
+      const vacancy=await rest(env,'vacancies?id=eq.'+vacancyId+'&status=eq.published&select=id');
+      if(!vacancy.ok)fail(503,'No pudimos consultar esta vacante. Intenta de nuevo más tarde.');
+      if((await vacancy.json()).length!==1)fail(400,'Esta vacante ya no está disponible. Puedes realizar una postulación general.');
+    }
+  }
+  const path=id+'.pdf',receipt=existingApplication?.receipt||'IMP-'+id.replaceAll('-','').slice(0,12).toUpperCase();
+  const row={id,receipt,name,email,phone,branch,object_path:path,file_size:cv.size,payload_hash:payloadHash,consent_version:CONSENT_VERSION,...(vacancyId?{vacancy_id:vacancyId}:{})};
+  if(!existingApplication){
+    const insert=await rest(env,'job_applications',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(row)});
+    if(insert.status===409){const previous=await rest(env,'job_applications?id=eq.'+id+'&select=receipt,payload_hash,status');if(!previous.ok)fail(503,'No pudimos confirmar tu postulación. Escríbenos al correo de selección.');const [existing]=await previous.json();if(existing?.payload_hash===payloadHash&&existing.status==='received')return json({ok:true,receipt:existing.receipt},200,origin);if(existing?.payload_hash!==payloadHash)fail(409,'Este intento no corresponde a los mismos datos. Recarga la página antes de enviar una nueva postulación.');}
+    if(!insert.ok&&insert.status!==409)fail(503,'No pudimos registrar tu postulación. Intenta de nuevo más tarde.');
+  }
   let uploaded=false;
   try{
     const upload=await fetch(baseUrl(env)+'/storage/v1/object/hojas-de-vida/'+path,{method:'POST',headers:supabaseHeaders(env,{'Content-Type':'application/pdf','x-upsert':'false'}),body:bytes,signal:timeout()});

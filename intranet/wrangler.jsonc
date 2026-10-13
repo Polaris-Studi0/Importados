@@ -1,0 +1,13 @@
+{
+  "name":"importados-intranet",
+  "account_id":"f5f40fe15b916c77d5eb9d5f08d413ff",
+  "main":"src/worker.js",
+  "compatibility_date":"2026-10-12",
+  "workers_dev":true,
+  "keep_vars":true,
+  "observability":{"enabled":false},
+  "assets":{"directory":"dist","binding":"ASSETS","not_found_handling":"single-page-application","run_worker_first":true},
+  "vars":{"SUPABASE_URL":"https://opeytkcqblgjfyvfjkwe.supabase.co","TURNSTILE_SITE_KEY":"0x4AAAAAAFVAn0Yl8_DHlrg-"},
+  "ratelimits":[{"name":"PUBLIC_LIMITER","namespace_id":"2026101203","simple":{"limit":20,"period":60}}],
+  "routes":[{"pattern":"intranet.tiendasimportados.com","custom_domain":true}]
+}
