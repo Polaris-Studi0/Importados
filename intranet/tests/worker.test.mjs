@@ -162,3 +162,17 @@ test('limiting PQRS requests runs before a human check or storage operation', as
     assert.equal(result.headers.get('Retry-After'), '60');
   });
 });
+
+
+test('only a verified administrator can provision a scoped first-access link, without sending email',async()=>{
+ const invited='5c6e6137-ff5b-44d9-bec7-83ea940b42c9';const link=serviceOrigin+'/auth/v1/verify?token=synthetic-only&type=invite';
+ await withFetch((url,options)=>{
+  if(url.pathname==='/auth/v1/user')return response({id:userId});
+  if(url.pathname==='/rest/v1/profiles'&&options.method!=='POST')return response([{id:userId,role:'admin',active:true}]);
+  if(url.pathname==='/auth/v1/admin/generate_link'){const body=JSON.parse(options.body);assert.equal(body.type,'invite');assert.equal(body.email,'new-team@example.invalid');assert.equal(url.searchParams.get('redirect_to'),'https://intranet.tiendasimportados.com/');return response({id:invited,action_link:link});}
+  if(url.pathname==='/rest/v1/profiles'){const body=JSON.parse(options.body);assert.equal(body.role,'cashier');assert.equal(body.branch_id,'niquia');assert.equal(body.id,invited);return new Response(null,{status:201});}
+  assert.fail('Unexpected provider: '+url.pathname);
+ },async calls=>{
+  const result=await worker.fetch(post('/api/team',{action:'invite',delivery:'link',email:'new-team@example.invalid',full_name:'Equipo sintético',role:'cashier',branch_id:'niquia'},{Authorization:'Bearer valid.session.signature'}),env);assert.equal(result.status,201);assert.equal((await result.json()).setup_link,link);assert.ok(!calls.some(x=>x.url.pathname==='/auth/v1/invite'));assert.equal(result.headers.get('Cache-Control'),'no-store');
+ });
+});
