@@ -11,8 +11,8 @@ Operación publicada en **https://intranet.tiendasimportados.com/**. Frontend Re
 - Personal de caja por sede y directorio de domiciliarios.
 - Catálogo interno con fotografías privadas, conteos manuales de inventario con historial y conocimiento por sede.
 - Chat privado entre administración y sedes, mensajes idempotentes, contador de no leídos, historial y avisos mientras la pestaña está abierta si la persona concede permiso.
-- Hojas de vida privadas recibidas desde la landing: búsqueda, filtros, PDF, notas y seguimiento humano (nueva, en revisión, contactada, archivada).
-- Vacantes: borrador, publicación explícita en la landing, cierre y reapertura. Los candidatos pueden elegir una vacante publicada o realizar una postulación general.
+- Hojas de vida privadas recibidas desde `/trabaja-con-nosotros/`: búsqueda, filtros, PDF, notas y seguimiento humano (nueva, en revisión, contactada, archivada).
+- Vacantes: borrador, publicación explícita en la página de postulaciones, cierre y reapertura. Los candidatos pueden elegir una vacante publicada o realizar una postulación general.
 - PQRS privadas, estado, notas internas y respuesta formal registrada. El cliente consulta con radicado y código secreto de 128 bits, además de verificación Turnstile.
 
 ## Primeros pasos

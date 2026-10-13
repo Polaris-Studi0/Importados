@@ -92,4 +92,23 @@ test('a vacancy retry with changed data is rejected before vacancy lookup or fil
   assert.equal(calls.length,2);assert.equal(calls.some(call=>new URL(call.u).pathname==='/rest/v1/vacancies'),false);
  },[verified(),json([{receipt:'IMP-ORIGINAL',payload_hash:'different-original-payload',status:'received'}])]);
 });
-test('operational opening and ceremony use separate Colombia dates',()=>{const c={};vm.createContext(c);vm.runInContext(fs.readFileSync(new URL('../../landing/dist/business-dates.js',import.meta.url),'utf8'),c);const d=c.ImportadosDates;assert.equal(d.phase(Date.parse('2026-10-14T23:59:59-05:00')).open,false);assert.equal(d.phase(Date.parse('2026-10-15T00:00:00-05:00')).open,true);assert.equal(d.phase(Date.parse('2026-11-13T23:59:59-05:00')).celebrating,false);assert.equal(d.phase(Date.parse('2026-11-14T00:00:00-05:00')).celebrating,true);assert.equal(d.phase(Date.parse('2026-11-15T23:59:59-05:00')).celebrating,true);assert.equal(d.phase(Date.parse('2026-11-16T00:00:00-05:00')).celebrated,true);});
+function businessDates(){const context={};vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('../../landing/dist/business-dates.js',import.meta.url),'utf8'),context);return context.ImportadosDates;}
+test('an unconfirmed opening never becomes open automatically on October 15 or inauguration dates',()=>{
+ const dates=businessDates();
+ for(const instant of ['2026-10-14T23:59:59-05:00','2026-10-15T00:00:00-05:00','2026-11-14T00:00:00-05:00','2026-11-16T00:00:00-05:00','2027-01-01T00:00:00-05:00']){
+  const phase=dates.phase(Date.parse(instant));
+  assert.equal(phase.open,false);
+  assert.equal(phase.status,'NIQUÍA · APERTURA MUY PRONTO');
+  assert.equal(phase.copy,'Apertura muy pronto.');
+  assert.equal(phase.bello,'En Bello, Niquía abrirá muy pronto. Mientras tanto, te esperamos en Santa Lucía.');
+ }
+});
+test('the grand inauguration remains November 14 and 15 in Colombia independently of opening',()=>{
+ const dates=businessDates();
+ assert.equal(dates.phase(Date.parse('2026-11-13T23:59:59-05:00')).celebrating,false);
+ assert.equal(dates.phase(Date.parse('2026-11-14T00:00:00-05:00')).celebrating,true);
+ const finalNight=dates.phase(Date.parse('2026-11-15T23:59:59-05:00'));
+ assert.equal(finalNight.celebrating,true);assert.equal(finalNight.celebrated,false);
+ const after=dates.phase(Date.parse('2026-11-16T00:00:00-05:00'));
+ assert.equal(after.celebrating,false);assert.equal(after.celebrated,true);assert.equal(after.open,false);
+});

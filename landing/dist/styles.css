@@ -28,3 +28,39 @@
 @media(max-width:450px){.careers-fields-grid{grid-template-columns:1fr;gap:0}.careers-panel{padding:20px 16px;border-width:4px}.careers h2{font-size:2.3rem}.careers-panel-top{font-size:.6875rem}.careers-panel .cv-upload{padding:14px}.announcement a{font-size:.6875rem}}
 
 .pqrs-dialog fieldset{border:0;padding:0;margin:0;min-width:0}.pqrs-consent{display:flex!important;align-items:flex-start;gap:10px;font-size:12px!important;line-height:1.65}.pqrs-consent input{width:19px!important;min-width:19px;height:19px;margin-top:4px;accent-color:#111}.pqrs-connection{font-size:12px;line-height:1.6;color:#555}.form-demo-feedback{white-space:pre-wrap;overflow-wrap:anywhere}#pqrs-verification{margin:14px 0}.pqrs-dialog textarea{min-height:100px}#public-vacancies{border-top:1px solid #ccc;padding:18px 0}#public-vacancies h4{margin:0 0 10px}#public-vacancies summary{cursor:pointer;padding:12px 0;font-weight:700}#public-vacancies p{white-space:pre-wrap;line-height:1.65;font-size:14px}
+
+/* El acceso breve en la tienda y la página independiente de talento. */
+.careers-teaser{padding-block:64px;background:#fff}
+.career-teaser-frame{border:2px solid var(--yellow);padding:38px 42px;display:grid;grid-template-columns:1.1fr 1fr;gap:60px;align-items:center;position:relative}
+.career-teaser-frame:before{content:'';position:absolute;inset:-2px auto auto -2px;width:44px;height:7px;background:var(--ink)}
+.career-teaser-frame .eyebrow{margin-bottom:16px;color:var(--muted)}
+.career-teaser-frame h2{font:800 clamp(1.9rem,3vw,2.8rem)/1.12 var(--display);letter-spacing:-.05em;margin:0}
+.career-teaser-frame h2 span{color:#777770}
+.career-teaser-action p{font-size:.9375rem;color:var(--muted);margin:0 0 20px}
+.career-teaser-action .button>span{font-size:1.2rem;margin-left:18px;line-height:1}
+.careers-page-main{padding:32px 0 96px;background:#fff}
+.career-back{display:inline-flex;align-items:center;min-height:44px;font-size:.8125rem;font-weight:700;color:var(--muted);margin-bottom:25px}
+.career-back:hover{color:var(--ink)}
+.careers-dedicated .careers-grid{grid-template-columns:.95fr 1.05fr;gap:76px}
+.careers-dedicated .careers-grid>*{min-width:0}
+.careers-dedicated .careers-copy{padding-top:18px}
+.careers-dedicated h1{font:800 clamp(3rem,4.5vw,4.25rem)/1.05 var(--display);letter-spacing:-.055em;margin:0 0 25px}
+.careers-dedicated h1 span{color:#777770}
+.careers-dedicated .career-lead{font-size:1rem;line-height:1.8;max-width:460px}
+.career-branches{display:flex;gap:12px;flex-wrap:wrap;margin:25px 0 32px}
+.career-branches>span{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:700;border:1px solid var(--line);padding:7px 9px;border-radius:3px}
+.career-branches .icon{width:15px;height:15px}
+.career-story{border:4px solid var(--yellow);padding:26px;color:#fff;position:relative}
+.career-story p{font:600 1.5rem/1.35 var(--display);letter-spacing:-.035em;margin:0 0 23px;padding-right:12px}
+.career-story strong{color:var(--yellow);font-weight:800}
+.career-story>span:last-child{font-size:.625rem;letter-spacing:.12em;font-weight:700;color:#bfbfb5}
+.career-story-star{position:absolute;right:22px;bottom:18px;color:var(--yellow);font-size:2.2rem;line-height:1}
+.careers-dedicated .careers-note{margin-top:30px;padding-block:24px}
+.careers-dedicated .careers-panel h2{font:800 2rem/1.1 var(--display);letter-spacing:-.04em;margin:25px 0 13px;color:var(--ink)}
+.career-mobile-cta{display:none}
+#postulacion,#privacidad-postulaciones{scroll-margin-top:120px}
+#public-vacancies h3{font:700 1.1rem/1.4 var(--display);margin:0 0 10px}
+.careers-page .footer-bottom a{text-decoration:underline;text-underline-offset:4px}
+@media(max-width:1100px){.career-teaser-frame{gap:35px;padding:32px}.careers-dedicated .careers-grid{gap:40px}.careers-dedicated h1{font-size:3.4rem}.career-branches{gap:8px}}
+@media(max-width:800px){.careers-teaser{padding-block:42px}.career-teaser-frame{grid-template-columns:1fr;gap:22px;padding:28px 24px}.career-teaser-frame h2{font-size:2.15rem}.career-teaser-action p{font-size:.875rem}.careers-page-main{padding:20px 0 64px}.career-back{margin-bottom:16px}.careers-dedicated .careers-grid{grid-template-columns:1fr;gap:36px}.careers-dedicated .careers-copy{padding-top:0}.careers-dedicated h1{font-size:clamp(2.7rem,9vw,3.7rem)}.career-story{display:none}.career-branches{margin-block:20px}.career-mobile-cta{display:inline-flex}.careers-dedicated .careers-note{margin-block:25px 18px;padding-block:20px}.careers-dedicated .careers-panel h2{font-size:1.9rem}.careers-dedicated .careers-panel{max-width:100%}#postulacion,#privacidad-postulaciones{scroll-margin-top:100px}.careers-page .footer-bottom{padding-bottom:24px}}
+@media(max-width:380px){.career-teaser-frame{padding:25px 18px}.career-teaser-frame h2{font-size:1.85rem}.career-teaser-action .button{width:100%}.careers-dedicated .careers-note{gap:12px}.careers-note strong{font-size:1rem}.careers-dedicated .careers-panel{padding:20px 13px}.careers-dedicated .career-lead{font-size:.9375rem}.careers-dedicated .careers-panel .cv-upload{padding:12px}}
