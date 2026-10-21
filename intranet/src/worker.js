@@ -1,3 +1,4 @@
+import {handleWhatsApp,runWhatsAppJobs} from './whatsapp.js';
 const ORIGINS=['https://tiendasimportados.com','https://www.tiendasimportados.com','https://intranet.tiendasimportados.com'];
 const BRANCHES=['santa-lucia','niquia'];
 class HttpError extends Error{constructor(status,message){super(message);this.status=status;}}
@@ -35,11 +36,12 @@ export async function receivePqrs(request,env,origin){await rate(request,env,'pq
  if(!r.ok)reject(503,'No pudimos confirmar la recepción. Reintenta con los mismos datos.');const [saved]=await r.json();if(!saved)reject(503,'No pudimos confirmar la recepción.');return json({ok:true,case_number:saved.case_number,consultation_code:code},201,origin);
 }
 export async function lookupPqrs(request,env,origin){await rate(request,env,'pqrs-lookup');const body=await boundedJson(request);const number=field(body,'case_number',40),code=field(body,'consultation_code',32);await human(body,env,origin,'pqrs_lookup');if(!/^IMP-PQ-[0-9A-F]{12}$/.test(number)||!/^[0-9a-f]{32}$/i.test(code))reject(404,'No encontramos una solicitud con esos datos.');const r=await db(env,'pqrs_cases?case_number=eq.'+encodeURIComponent(number)+'&lookup_hash=eq.'+await sha(code)+'&select=case_number,subject,status,response_message,created_at,updated_at');if(!r.ok)reject(503,'No pudimos consultar la solicitud.');const [item]=await r.json();if(!item)reject(404,'No encontramos una solicitud con esos datos.');return json({ok:true,case:item},200,origin);}
-export default {async fetch(request,env){const url=new URL(request.url),origin=request.headers.get('Origin'),allowed=ORIGINS.includes(origin);try{
+export default {async scheduled(_controller,env,ctx){ctx.waitUntil(runWhatsAppJobs(env).catch(()=>{}));},async fetch(request,env,ctx){const url=new URL(request.url),origin=request.headers.get('Origin'),allowed=ORIGINS.includes(origin);try{
  if(url.pathname==='/health')return json({ok:true});
  if(url.pathname.startsWith('/api/')){
   if(origin&&!allowed)reject(403,'Origen no permitido.');
   if(request.method==='OPTIONS'){if(!allowed)reject(403,'Origen no permitido.');return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','Vary':'Origin'}});}
+  if(url.pathname.startsWith('/api/whatsapp/'))return await handleWhatsApp(request,env,allowed?origin:undefined,ctx);
   if(url.pathname==='/api/team')return await team(request,env,allowed?origin:undefined);
   if(url.pathname==='/api/public/config'&&request.method==='GET')return json({enabled:!!env.TURNSTILE_SECRET_KEY&&!!env.SUPABASE_SERVICE_KEY,siteKey:env.TURNSTILE_SITE_KEY},200,allowed?origin:undefined);
   if(url.pathname==='/api/vacancies'&&request.method==='GET'){const r=await db(env,'vacancies?status=eq.published&select=id,title,branch_id,description,requirements&order=created_at.desc&limit=100');if(!r.ok)reject(503,'No pudimos consultar las vacantes.');return json({vacancies:await r.json()},200,allowed?origin:undefined);}

@@ -1,0 +1,382 @@
+{
+  "workflow_id": "m2q8tgG99ibAB6TO",
+  "workflow_url": "https://intranetelrey.app.n8n.cloud/workflow/m2q8tgG99ibAB6TO",
+  "published": {
+    "id": "m2q8tgG99ibAB6TO",
+    "name": "IMPORTADOS · WhatsApp · Motor de atención",
+    "active": true,
+    "versionId": "28d88274-a095-4e72-850e-e53eda68723d",
+    "activeVersionId": "28d88274-a095-4e72-850e-e53eda68723d",
+    "settings": {
+      "executionOrder": "v1",
+      "availableInMCP": true,
+      "timezone": "America/Bogota",
+      "saveExecutionProgress": false,
+      "saveManualExecutions": false,
+      "saveDataErrorExecution": "none",
+      "saveDataSuccessExecution": "none",
+      "executionTimeout": 120,
+      "binaryMode": "separate"
+    },
+    "updatedAt": "2026-10-21T10:43:30.442Z"
+  },
+  "model": "gpt-5-mini",
+  "data_scope": "Only synthetic questions/context. No real customer data, operational DB writes, WhatsApp sends or El Rey executions.",
+  "local_guard_tests": {
+    "passed": 22,
+    "failed": 0,
+    "command": "node --test n8n/tests/guards.test.mjs",
+    "source_sha256": {
+      "attention-core.sdk.ts": "7d27fe75a423559df56b001cffd9c98de9524dada370c46aa3885d383a3ea915",
+      "attention-core.workflow.json": "4cac444aaa3aad64bc58869e13fc4cdd93f9e32cd1b75161f90b9ecd52c777ee",
+      "system-prompt.md": "00e3aa54e1faed41c0d3ba66f1b9289cf72f701ee730683893089964e11dff66",
+      "tests/guards.test.mjs": "d778288c3a007af8654c36cd5d6c8489b0dc81bcee9d9f30ae533f21d23519f6",
+      "source/buscar_promociones.js": "c967543c380dc66365edc7bde0de2d49b56d626bf6b4d276e873fcf67cb46430",
+      "source/consultar_informacion.js": "7054fa25568282488d43164f2e56b676310224b155add6d961a32a02372ae709",
+      "source/consultar_pedido.js": "486c376756cc5320843ec8dfa5470e62edf3c24ae7369c980bcbcc544025c345",
+      "source/consultar_qr.js": "c0204572013e0c220115f99a002b00c36f9bef9323ddc7550762bcd51ad559ca",
+      "source/cotizar_carrito.js": "e83472a27613b57be23df5ecfc5bfae8e1face0a65a3b8c018b108d13556bd4a",
+      "source/safe-failure.js": "2dfb7b99584e831b21aa01155a6418f4645fdc853d78f0a4d61105329f91bdef",
+      "source/solicitar_equipo.js": "2df8b2dfb01447ed132e4629aa7158068807b239e19620730610ab2c8b94066b",
+      "source/validate-decision.js": "50809f65504d573c8a7f8156db92c30d71ee32d4f4508e6b42ce83369531b017",
+      "source/validate-turn.js": "2293df1f6e5d5c6cc9fc81f0a881d7aa95584485f2ffefb460398cb8a7ab00ca"
+    }
+  },
+  "summary": "Four distinct model scenarios, two follow-up regression runs. Initial missing price and extra-question issues corrected by final published guard; final regression execution510 passed. No real-model reruns after usage pause.",
+  "model_runs": [
+    {
+      "execution_id": "504",
+      "execution_mode": "manual",
+      "execution_status": "success",
+      "started_at": "2026-10-21T03:16:25.655Z",
+      "stopped_at": "2026-10-21T03:16:32.293Z",
+      "workflow_version_id": "aeaa0225-5356-45bf-bb10-ffdab078c925",
+      "purpose": "store_location_and_physical_hours",
+      "assessment": "passed",
+      "output": {
+        "contract": "importados.bot.decision.v1",
+        "status": "decision_ready",
+        "mode": "test",
+        "source": "synthetic",
+        "send_allowed": false,
+        "requires_commit": true,
+        "mutations_executed": [],
+        "decision": {
+          "media_ids": [],
+          "intent": "information",
+          "reply_text": "La sede Santa Lucía queda en carrera 87 # 47DD-50. El horario de la tienda es de 9:00 a. m. a 8:00 p. m. (No hay horario confirmado para WhatsApp ni para domicilios).",
+          "offered_product_ids": [],
+          "quote": null,
+          "actions": [],
+          "checkout": {
+            "customer_name": "",
+            "recipient_name": "",
+            "recipient_phone": "",
+            "fulfillment_type": "",
+            "delivery_address": "",
+            "delivery_zone": "",
+            "payment_method": ""
+          },
+          "confirmed_item": null,
+          "accept_summary": false,
+          "cancel_cart": false
+        },
+        "tools_used": [
+          "consultar_informacion"
+        ]
+      }
+    },
+    {
+      "execution_id": "505",
+      "execution_mode": "manual",
+      "execution_status": "success",
+      "started_at": "2026-10-21T03:17:20.882Z",
+      "stopped_at": "2026-10-21T03:17:30.454Z",
+      "workflow_version_id": "0d76b942-9075-4e1e-a499-d15683c751a4",
+      "purpose": "ambiguous_instagram_product_no_invented_price",
+      "assessment": "passed",
+      "output": {
+        "contract": "importados.bot.decision.v1",
+        "status": "decision_ready",
+        "mode": "test",
+        "source": "synthetic",
+        "send_allowed": false,
+        "requires_commit": true,
+        "mutations_executed": [],
+        "decision": {
+          "media_ids": [],
+          "intent": "clarification",
+          "reply_text": "¿Cuál producto viste en Instagram? Dime el nombre, el enlace o envíame una foto para que lo busque y te confirme si hay promoción y el precio.",
+          "offered_product_ids": [],
+          "quote": null,
+          "actions": [],
+          "checkout": {
+            "customer_name": "",
+            "recipient_name": "",
+            "recipient_phone": "",
+            "fulfillment_type": "",
+            "delivery_address": "",
+            "delivery_zone": "",
+            "payment_method": ""
+          },
+          "confirmed_item": null,
+          "accept_summary": false,
+          "cancel_cart": false
+        },
+        "tools_used": [
+          "consultar_informacion"
+        ]
+      }
+    },
+    {
+      "execution_id": "506",
+      "execution_mode": "manual",
+      "execution_status": "success",
+      "started_at": "2026-10-21T03:17:47.503Z",
+      "stopped_at": "2026-10-21T03:17:55.209Z",
+      "workflow_version_id": "0d76b942-9075-4e1e-a499-d15683c751a4",
+      "purpose": "own_careers_url_no_hiring_claim",
+      "assessment": "passed",
+      "output": {
+        "contract": "importados.bot.decision.v1",
+        "status": "decision_ready",
+        "mode": "test",
+        "source": "synthetic",
+        "send_allowed": false,
+        "requires_commit": true,
+        "mutations_executed": [],
+        "decision": {
+          "media_ids": [],
+          "intent": "information",
+          "reply_text": "Puedes postular diligenciando el formulario oficial en https://tiendasimportados.com/trabaja-con-nosotros. No recibimos hojas de vida por este chat; completar el formulario no garantiza vacantes ni contratación. Si quieres, te comparto el enlace de nuevo o te explico cómo llenarlo.",
+          "offered_product_ids": [],
+          "quote": null,
+          "actions": [],
+          "checkout": {
+            "customer_name": "",
+            "recipient_name": "",
+            "recipient_phone": "",
+            "fulfillment_type": "",
+            "delivery_address": "",
+            "delivery_zone": "",
+            "payment_method": ""
+          },
+          "confirmed_item": null,
+          "accept_summary": false,
+          "cancel_cart": false
+        },
+        "tools_used": [
+          "consultar_informacion"
+        ]
+      }
+    },
+    {
+      "execution_id": "507",
+      "execution_mode": "manual",
+      "execution_status": "success",
+      "started_at": "2026-10-21T03:18:09.782Z",
+      "stopped_at": "2026-10-21T03:18:27.981Z",
+      "workflow_version_id": "0d76b942-9075-4e1e-a499-d15683c751a4",
+      "purpose": "missing_catalogue_availability_and_price",
+      "assessment": "required_guard_fix_price_omitted",
+      "output": {
+        "contract": "importados.bot.decision.v1",
+        "status": "decision_ready",
+        "mode": "test",
+        "source": "synthetic",
+        "send_allowed": false,
+        "requires_commit": true,
+        "mutations_executed": [],
+        "decision": {
+          "media_ids": [],
+          "intent": "handoff",
+          "reply_text": "Dame un momento y te confirmo.",
+          "offered_product_ids": [],
+          "quote": null,
+          "actions": [
+            {
+              "type": "propose_human_task",
+              "reason": "missing_information",
+              "question": "En la sede Santa Lucía: ¿tienen licuadoras disponibles?",
+              "related_message_id": "synthetic-message-model-4"
+            }
+          ],
+          "checkout": {
+            "customer_name": "",
+            "recipient_name": "",
+            "recipient_phone": "",
+            "fulfillment_type": "",
+            "delivery_address": "",
+            "delivery_zone": "",
+            "payment_method": ""
+          },
+          "confirmed_item": null,
+          "accept_summary": false,
+          "cancel_cart": false
+        },
+        "tools_used": [
+          "buscar_promociones",
+          "solicitar_equipo",
+          "consultar_informacion"
+        ]
+      }
+    },
+    {
+      "execution_id": "509",
+      "execution_mode": "manual",
+      "execution_status": "success",
+      "started_at": "2026-10-21T03:19:24.591Z",
+      "stopped_at": "2026-10-21T03:19:34.843Z",
+      "workflow_version_id": "09faa5ab-d3e7-46be-bfbb-f1e2aec738a5",
+      "purpose": "availability_price_regression",
+      "assessment": "required_guard_fix_unrequested_variants",
+      "output": {
+        "contract": "importados.bot.decision.v1",
+        "status": "decision_ready",
+        "mode": "test",
+        "source": "synthetic",
+        "send_allowed": false,
+        "requires_commit": true,
+        "mutations_executed": [],
+        "decision": {
+          "media_ids": [],
+          "intent": "handoff",
+          "reply_text": "Dame un momento y te confirmo.",
+          "offered_product_ids": [],
+          "quote": null,
+          "actions": [
+            {
+              "type": "propose_human_task",
+              "reason": "missing_information",
+              "question": "El cliente consulta por licuadoras en la sede Santa Lucía: ¿tienen licuadoras disponibles y cuál es su precio y variantes (marca, capacidad, color) y stock por modelo?",
+              "related_message_id": "synthetic-message-model-5"
+            }
+          ],
+          "checkout": {
+            "customer_name": "",
+            "recipient_name": "",
+            "recipient_phone": "",
+            "fulfillment_type": "",
+            "delivery_address": "",
+            "delivery_zone": "",
+            "payment_method": ""
+          },
+          "confirmed_item": null,
+          "accept_summary": false,
+          "cancel_cart": false
+        },
+        "tools_used": [
+          "consultar_informacion",
+          "buscar_promociones",
+          "solicitar_equipo"
+        ]
+      }
+    },
+    {
+      "execution_id": "510",
+      "execution_mode": "manual",
+      "execution_status": "success",
+      "started_at": "2026-10-21T03:20:43.222Z",
+      "stopped_at": "2026-10-21T03:21:07.193Z",
+      "workflow_version_id": "79fcb336-de4e-4c16-a660-57feb258aad3",
+      "purpose": "availability_price_final_regression",
+      "assessment": "passed",
+      "output": {
+        "contract": "importados.bot.decision.v1",
+        "status": "decision_ready",
+        "mode": "test",
+        "source": "synthetic",
+        "send_allowed": false,
+        "requires_commit": true,
+        "mutations_executed": [],
+        "decision": {
+          "media_ids": [],
+          "intent": "handoff",
+          "reply_text": "Dame un momento y te confirmo.",
+          "offered_product_ids": [],
+          "quote": null,
+          "actions": [
+            {
+              "type": "propose_human_task",
+              "reason": "missing_information",
+              "question": "En Santa Lucía: ¿Tienen licuadoras y cuánto cuestan?",
+              "related_message_id": "synthetic-message-model-6"
+            }
+          ],
+          "checkout": {
+            "customer_name": "",
+            "recipient_name": "",
+            "recipient_phone": "",
+            "fulfillment_type": "",
+            "delivery_address": "",
+            "delivery_zone": "",
+            "payment_method": ""
+          },
+          "confirmed_item": null,
+          "accept_summary": false,
+          "cancel_cart": false
+        },
+        "tools_used": [
+          "consultar_informacion",
+          "buscar_promociones",
+          "solicitar_equipo"
+        ]
+      }
+    }
+  ],
+  "contract_rejection": {
+    "execution_id": "508",
+    "mode": "manual",
+    "attempted_pair": {
+      "mode": "preview",
+      "source": "synthetic"
+    },
+    "http_status": 422,
+    "output": {
+      "contract": "importados.bot.decision.v1",
+      "status": "invalid_snapshot",
+      "turn_id": "66666666-6666-4666-8666-666666666666",
+      "send_allowed": false,
+      "requires_commit": false,
+      "mutations_executed": [],
+      "decision": null
+    },
+    "model_invoked": false
+  },
+  "limits": [
+    "Manual MCP runs validate behavior on synthetic input, not HTTP header authentication.",
+    "Root separately verifies production route authentication using private Worker secret.",
+    "No real WhatsApp delivery or commercial transaction acceptance tested.",
+    "Public attention remains disabled pending own privacy and verified webhook integration."
+  ],
+  "post_test_change": {
+    "type": "prompt_fact_only",
+    "description": "Removed stale API registration-pending assertion; technical channel state belongs to server. Runtime guards and model settings unchanged.",
+    "validated_sdk": true,
+    "validation_warnings": [],
+    "model_rerun": false,
+    "published_version_id": "28d88274-a095-4e72-850e-e53eda68723d"
+  },
+  "reference_workflow_unchanged": {
+    "id": "pGxqUgjYE6NCyiwZ",
+    "active": true,
+    "versionId": "53cfa73d-0b89-4af2-8b08-be53399085a0",
+    "activeVersionId": "53cfa73d-0b89-4af2-8b08-be53399085a0",
+    "updatedAt": "2026-10-19T19:20:50.372Z"
+  },
+  "final_source_sha256": {
+    "attention-core.sdk.ts": "472220ecc3d1a50a21ed549004b64c64f0b467a9703e020bddc761aa06ceccd3",
+    "attention-core.workflow.json": "283eb5bb77ae790c3410d35ed581c7242b4495bdbb140c1a1ddcfecff6268902",
+    "system-prompt.md": "2876d3e4bbee6cf1242b802e30a2a748665be9014cc5978f6df1f86a1e7678fc",
+    "tests/guards.test.mjs": "d778288c3a007af8654c36cd5d6c8489b0dc81bcee9d9f30ae533f21d23519f6",
+    "source/buscar_promociones.js": "c967543c380dc66365edc7bde0de2d49b56d626bf6b4d276e873fcf67cb46430",
+    "source/consultar_informacion.js": "7054fa25568282488d43164f2e56b676310224b155add6d961a32a02372ae709",
+    "source/consultar_pedido.js": "486c376756cc5320843ec8dfa5470e62edf3c24ae7369c980bcbcc544025c345",
+    "source/consultar_qr.js": "c0204572013e0c220115f99a002b00c36f9bef9323ddc7550762bcd51ad559ca",
+    "source/cotizar_carrito.js": "e83472a27613b57be23df5ecfc5bfae8e1face0a65a3b8c018b108d13556bd4a",
+    "source/safe-failure.js": "2dfb7b99584e831b21aa01155a6418f4645fdc853d78f0a4d61105329f91bdef",
+    "source/solicitar_equipo.js": "2df8b2dfb01447ed132e4629aa7158068807b239e19620730610ab2c8b94066b",
+    "source/validate-decision.js": "50809f65504d573c8a7f8156db92c30d71ee32d4f4508e6b42ce83369531b017",
+    "source/validate-turn.js": "2293df1f6e5d5c6cc9fc81f0a881d7aa95584485f2ffefb460398cb8a7ab00ca"
+  }
+}

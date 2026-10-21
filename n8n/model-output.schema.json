@@ -1,0 +1,166 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "intent",
+    "reply_text",
+    "product_ids",
+    "quote_items",
+    "qr_asset_id",
+    "human_reason",
+    "human_question",
+    "checkout",
+    "accept_summary",
+    "cancel_cart",
+    "confirmed_item",
+    "media_ids"
+  ],
+  "properties": {
+    "intent": {
+      "type": "string",
+      "enum": [
+        "information",
+        "discovery",
+        "quote",
+        "qr",
+        "handoff",
+        "order_status",
+        "clarification",
+        "close",
+        "checkout"
+      ]
+    },
+    "reply_text": {
+      "type": "string"
+    },
+    "product_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "quote_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "product_id",
+          "quantity"
+        ],
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "qr_asset_id": {
+      "type": "string"
+    },
+    "human_reason": {
+      "type": "string",
+      "enum": [
+        "",
+        "human_request",
+        "missing_information",
+        "stock_check",
+        "payment_review",
+        "pqrs"
+      ]
+    },
+    "human_question": {
+      "type": "string"
+    },
+    "checkout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "customer_name",
+        "recipient_name",
+        "recipient_phone",
+        "fulfillment_type",
+        "delivery_address",
+        "delivery_zone",
+        "payment_method"
+      ],
+      "properties": {
+        "customer_name": {
+          "type": "string"
+        },
+        "recipient_name": {
+          "type": "string"
+        },
+        "recipient_phone": {
+          "type": "string"
+        },
+        "fulfillment_type": {
+          "type": "string"
+        },
+        "delivery_address": {
+          "type": "string"
+        },
+        "delivery_zone": {
+          "type": "string"
+        },
+        "payment_method": {
+          "type": "string"
+        }
+      }
+    },
+    "accept_summary": {
+      "type": "boolean"
+    },
+    "cancel_cart": {
+      "type": "boolean"
+    },
+    "confirmed_item": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_task_id",
+            "source_excerpt",
+            "name",
+            "variant",
+            "unit_price_cop",
+            "quantity"
+          ],
+          "properties": {
+            "source_task_id": {
+              "type": "string"
+            },
+            "source_excerpt": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "variant": {
+              "type": "string"
+            },
+            "unit_price_cop": {
+              "type": "integer"
+            },
+            "quantity": {
+              "type": "integer"
+            }
+          }
+        }
+      ]
+    },
+    "media_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
