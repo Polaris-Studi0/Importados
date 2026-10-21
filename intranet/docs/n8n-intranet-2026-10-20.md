@@ -48,3 +48,9 @@ La corrección incremental `202610210001_whatsapp_privacy_receipts.sql` también
 Worker inicial publicado el 21 de octubre: versión `04b6a185-5315-4505-8405-a887bf8619c9`, con recuperación cada minuto y banderas públicas inicialmente apagadas. Samuel aprobó privacidad y eliminación con `Importados@polaris-studio.tech` como canal; ambas páginas responden 200 en el dominio. El usuario guardó el verify token, Meta confirmó messages suscrito y la app publicada. Se autorizó después activar atención; solo queda pendiente acreditar recepción y entrega real mediante la prueba del usuario.
 
 Los archivos de rollback se conservan en `backups/intranet-antes-whatsapp-2026-10-20.zip`; el respaldo excluye variables locales y parte del checkout publicado anterior.
+
+## Corrección de recepción · 21 de octubre
+
+La primera prueba del usuario no recibió respuesta. La base no tenía conversaciones, inbox ni outbox. Graph GET sobre el recurso subscribed_apps de la WABA propia devolvió lista vacía: verificar el callback y suscribir el campo messages en la app no había vinculado la WABA a la app. Se completó POST subscribed_apps, autorizado dentro de la activación del canal; Meta devolvió success:true y GET confirmó exclusivamente la app1378513457688529. No se enviaron mensajes de prueba desde el servidor. Pendiente del nuevo mensaje del usuario para comprobar recepción y entrega.
+
+El diagnóstico se ejecutó en una sesión remota temporal de Wrangler que heredó el secreto de Cloudflare, sin exportar el access token ni crear una ruta de mantenimiento en producción.
