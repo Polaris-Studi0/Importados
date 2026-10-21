@@ -1,25 +1,50 @@
 {
-  "name":"importados-intranet",
-  "account_id":"f5f40fe15b916c77d5eb9d5f08d413ff",
-  "main":"src/worker.js",
-  "compatibility_date":"2026-10-12",
-  "workers_dev":true,
-  "keep_vars":true,
-  "observability":{"enabled":false},
-  "triggers":{"crons":["* * * * *"]},
-  "assets":{"directory":"dist","binding":"ASSETS","not_found_handling":"single-page-application","run_worker_first":true},
-  "vars":{
-    "SUPABASE_URL":"https://opeytkcqblgjfyvfjkwe.supabase.co",
-    "TURNSTILE_SITE_KEY":"0x4AAAAAAFVAn0Yl8_DHlrg-",
-    "WHATSAPP_APP_ID":"1378513457688529",
-    "WHATSAPP_WABA_ID":"968909369072994",
-    "WHATSAPP_PHONE_NUMBER_ID":"1398533173340545",
-    "WHATSAPP_GRAPH_VERSION":"v25.0",
-    "N8N_BOT_WEBHOOK_URL":"https://intranetelrey.app.n8n.cloud/webhook/importados-assistant-turn-v1",
-    "WHATSAPP_INGRESS_ENABLED":"false",
-    "BOT_AI_ENABLED":"false",
-    "WHATSAPP_OUTBOUND_ENABLED":"false"
+  "name": "importados-intranet",
+  "account_id": "f5f40fe15b916c77d5eb9d5f08d413ff",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-12",
+  "workers_dev": true,
+  "keep_vars": true,
+  "observability": {
+    "enabled": false
   },
-  "ratelimits":[{"name":"PUBLIC_LIMITER","namespace_id":"2026101203","simple":{"limit":20,"period":60}}],
-  "routes":[{"pattern":"intranet.tiendasimportados.com","custom_domain":true}]
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  },
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "vars": {
+    "SUPABASE_URL": "https://opeytkcqblgjfyvfjkwe.supabase.co",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFVAn0Yl8_DHlrg-",
+    "WHATSAPP_APP_ID": "1378513457688529",
+    "WHATSAPP_WABA_ID": "968909369072994",
+    "WHATSAPP_PHONE_NUMBER_ID": "1398533173340545",
+    "WHATSAPP_GRAPH_VERSION": "v25.0",
+    "N8N_BOT_WEBHOOK_URL": "https://intranetelrey.app.n8n.cloud/webhook/importados-assistant-turn-v1",
+    "WHATSAPP_INGRESS_ENABLED": "true",
+    "BOT_AI_ENABLED": "true",
+    "WHATSAPP_OUTBOUND_ENABLED": "true"
+  },
+  "ratelimits": [
+    {
+      "name": "PUBLIC_LIMITER",
+      "namespace_id": "2026101203",
+      "simple": {
+        "limit": 20,
+        "period": 60
+      }
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "intranet.tiendasimportados.com",
+      "custom_domain": true
+    }
+  ]
 }

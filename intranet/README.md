@@ -28,7 +28,7 @@ Operación publicada en **https://intranet.tiendasimportados.com/**. Frontend Re
 
 ## Límites de esta versión
 
-WhatsApp tiene número registrado y recursos propios, secretos de Cloudflare y motor privado de n8n preparado. La atención pública permanece apagada hasta completar webhook, publicación de Meta, privacidad y verificación de recepción y respuesta. Las campañas no están implementadas. El asistente deriva consultas comerciales al equipo: no reserva inventario, crea compras automáticas, envía QR ni aprueba pagos. Conserva referencias de adjuntos de Meta, sin descargarlos. Consulta `docs/n8n-intranet-2026-10-20.md`.
+WhatsApp tiene número registrado y recursos propios, secretos de Cloudflare y motor privado de n8n. Samuel aprobó y activó la atención el 21/10/2026 después de publicar privacidad, verificar el webhook y publicar la app en Meta. La recepción y entrega reales quedan pendientes de la prueba funcional de Samuel. Las campañas no están implementadas. El asistente deriva consultas comerciales al equipo: no reserva inventario, crea compras automáticas, envía QR ni aprueba pagos. Conserva referencias de adjuntos de Meta, sin descargarlos. Consulta `docs/n8n-intranet-2026-10-20.md`.
 
 Los conteos de inventario son manuales: guardar un pedido no reserva ni descuenta automáticamente existencias. Las respuestas de PQRS se consultan en la web; no se envían avisos automáticos por email o WhatsApp. Los estados de candidaturas son seguimiento del equipo, no decisiones automáticas de selección.
 

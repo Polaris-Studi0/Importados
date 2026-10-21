@@ -23,9 +23,9 @@ La administración conserva su acceso actual con `contact@polaris-studio.tech`. 
 
 La pestaña de integración permite ensayar una consulta sintética. Esta prueba no crea conversaciones ni pedidos ni envía WhatsApp. Una simulación exitosa no acredita registro del número, recepción de eventos firmados ni entrega al cliente.
 
-## Activación pendiente
+## Activación autorizada
 
-Las tres banderas de recepción, IA y envío permanecen en `false`, tanto en configuración como en la base. Se preparó recuperación programada cada minuto; con las banderas apagadas no procesa atención pública. Antes de habilitarlas se deben comprobar:
+Samuel autorizó publicar la app y activar recepción, IA y envío el 21 de octubre. Las tres banderas están activadas y la base fija el inicio de atención en `2026-10-21T11:01:13.995175Z`, con política `2026-10-21.v1`. La recuperación programada corre cada minuto. Los requisitos de configuración se completaron; la prueba de recepción y entrega real la realizará Samuel:
 
 1. Número real registrado, WABA y Phone Number ID propios de Importados, permisos y versión de Graph.
 2. App Secret, access token y verify token propios como secretos de Cloudflare.
@@ -45,6 +45,6 @@ La batería previa aprobó 69 pruebas de intranet, permisos, base y WhatsApp; de
 
 La corrección incremental `202610210001_whatsapp_privacy_receipts.sql` también se aplicó. Vincula recibos al aviso y versión exactos; las comprobaciones focales aprobaron 11 casos SQL y dos casos Worker de cortesías y presupuesto temporal. La conexión HTTP real con n8n aceptó la cabecera propia y rechazó el contrato incompleto con 422, sin ejecutar el modelo ni enviar mensajes.
 
-Worker publicado el 21 de octubre: versión `04b6a185-5315-4505-8405-a887bf8619c9`, con recuperación cada minuto y banderas públicas apagadas. Samuel aprobó publicar privacidad y eliminación con `Importados@polaris-studio.tech` como canal. Permanecen pendientes la verificación/suscripción en Meta, publicación de la app y prueba real autorizada.
+Worker inicial publicado el 21 de octubre: versión `04b6a185-5315-4505-8405-a887bf8619c9`, con recuperación cada minuto y banderas públicas inicialmente apagadas. Samuel aprobó privacidad y eliminación con `Importados@polaris-studio.tech` como canal; ambas páginas responden 200 en el dominio. El usuario guardó el verify token, Meta confirmó messages suscrito y la app publicada. Se autorizó después activar atención; solo queda pendiente acreditar recepción y entrega real mediante la prueba del usuario.
 
 Los archivos de rollback se conservan en `backups/intranet-antes-whatsapp-2026-10-20.zip`; el respaldo excluye variables locales y parte del checkout publicado anterior.
