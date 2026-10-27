@@ -13,7 +13,9 @@
     "accept_summary",
     "cancel_cart",
     "confirmed_item",
-    "media_ids"
+    "media_ids",
+    "human_task_id",
+    "human_priority"
   ],
   "properties": {
     "intent": {
@@ -161,6 +163,16 @@
       "items": {
         "type": "string"
       }
+    },
+    "human_task_id": {
+      "type": "string"
+    },
+    "human_priority": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "high"
+      ]
     }
   }
 }

@@ -55,3 +55,6 @@ export function uploadWhatsAppPhoto(conversationId,file,requestId,signal) {
 export function getWhatsAppPhoto(conversationId,mediaId,signal) {
  return request(`/conversations/${encodeURIComponent(conversationId)}/media/${encodeURIComponent(mediaId)}`,{binary:true,signal});
 }
+export function getWhatsAppAttachment(conversationId,messageId,signal) {
+ return request(`/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/attachment`,{binary:true,signal});
+}

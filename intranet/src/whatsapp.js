@@ -1,4 +1,5 @@
 import {uploadOperatorPhoto,viewOperatorPhoto} from './whatsapp-media.js';
+import {viewIncomingMedia} from './whatsapp-incoming-media.js';
 import {canSend,configuration,db,digest,fail,readiness,readJson,reply,scopedConversation,staff,uuid,validWorkflowUrl,WhatsAppError,NUMBER,rpc} from './whatsapp-core.js';
 import {ingress} from './whatsapp-ingress.js';
 import {callAssistant,runWhatsAppJobs,sendOne,syntheticTurn} from './bot-turn.js';
@@ -6,7 +7,7 @@ import {callAssistant,runWhatsAppJobs,sendOne,syntheticTurn} from './bot-turn.js
 export {runWhatsAppJobs};
 const CONVERSATION_FIELDS='id,branch_id,customer_name,customer_phone,customer_bsuid,status,manual_paused,consent_status,last_customer_at,last_message_at,last_message_preview,updated_at,control_version,context_version';
 const MESSAGE_FIELDS='id,direction,source,kind,body,attachment,status,created_at,meta_message_id';
-const TASK_FIELDS='id,conversation_id,branch_id,kind,question,status,answer,source_message_id,created_at,updated_at,resolved_at';
+const TASK_FIELDS='id,conversation_id,branch_id,kind,question,latest_question,priority,revision,status,answer,source_message_id,created_at,updated_at,resolved_at';
 const background=(ctx,work)=>{if(ctx?.waitUntil)ctx.waitUntil(work().catch(()=>{}));};
 
 async function status(env){
@@ -45,9 +46,11 @@ async function handle(request,env,origin,ctx){
  }
  if(path==='/api/whatsapp/tasks'&&request.method==='GET'){
   // Scope through the current parent conversation, not a stale task branch snapshot.
-  const tasks=await db(env,'whatsapp_tasks?select='+TASK_FIELDS+',whatsapp_conversations!inner(branch_id)&'+(actor.role==='admin'?'':'whatsapp_conversations.branch_id=eq.'+encodeURIComponent(actor.branch_id)+'&')+'status=eq.pending&order=created_at.desc,id&limit=101');
+  const tasks=await db(env,'whatsapp_tasks?select='+TASK_FIELDS+',whatsapp_conversations!inner(branch_id)&'+(actor.role==='admin'?'':'whatsapp_conversations.branch_id=eq.'+encodeURIComponent(actor.branch_id)+'&')+'status=eq.pending&order=priority.asc,updated_at.desc,id&limit=101');
   return reply({tasks:tasks.slice(0,100).map(({whatsapp_conversations:_parent,...task})=>task),limits:{tasks:100,truncated:tasks.length>100}},200,origin);
  }
+ const incomingMatch=path.match(/^\/api\/whatsapp\/conversations\/([^/]+)\/messages\/([^/]+)\/attachment$/);
+ if(incomingMatch&&request.method==='GET')return viewIncomingMedia(env,await scopedConversation(env,actor,incomingMatch[1]),incomingMatch[2]);
  const mediaMatch=path.match(/^\/api\/whatsapp\/conversations\/([^/]+)\/media(?:\/([^/]+))?$/);
  if(mediaMatch){
   const c=await scopedConversation(env,actor,mediaMatch[1]);
@@ -65,6 +68,9 @@ async function handle(request,env,origin,ctx){
    configuration(env),
    db(env,'whatsapp_outbox?conversation_id=eq.'+conversation.id+'&message_id=is.null&select=id,source,body,status,created_at,meta_message_id,last_error&order=created_at.desc&limit=100')
   ]);
+  const updates=tasks.length?await db(env,'whatsapp_task_updates?task_id=in.('+tasks.map(t=>t.id).join(',')+')&select=task_id,message_id,question,priority,created_at&order=created_at.desc&limit=200'):[];
+  const references=tasks.length?await db(env,'whatsapp_task_attachments?task_id=in.('+tasks.map(t=>t.id).join(',')+')&select=task_id,message_id&limit=100'):[];
+  for(const task of tasks){task.updates=updates.filter(u=>u.task_id===task.id).slice(0,20).reverse();task.attachments=references.filter(a=>a.task_id===task.id);}
   const history=[...messages,...outbox.map(item=>({...item,direction:'outbound',kind:'text',delivery_pending:true}))].sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
   return reply({conversation,messages:history.slice(0,100).reverse(),outbox,tasks:tasks.slice(0,100),can_send:canSend(env,cfg,conversation),limits:{messages:100,tasks:100,messages_truncated:history.length>100,tasks_truncated:tasks.length>100}},200,origin);
  }

@@ -1,0 +1,42 @@
+{
+  "synthetic": true,
+  "real_messages_sent": false,
+  "cases": [
+    {
+      "case": "AT-01",
+      "http_status": 200,
+      "status": "decision_ready",
+      "intent": "handoff",
+      "reply": "Lamento la demora y la molestia. Añadimos tu reclamo a la consulta pendiente para que el equipo lo revise.",
+      "action": {
+        "type": "propose_human_task",
+        "reason": "missing_information",
+        "question": "El cliente necesita el producto \"sintético A\" para mañana. Confirmen disponibilidad inmediata y precio; por favor priorizar la gestión y responder si es posible entregar antes de 2 días. Mensaje del cliente: \"¿Otros dos días más? Lo necesito para mañana.\"",
+        "related_message_id": "be7b6364-fbc2-440d-9f08-cf478564280c",
+        "task_id": "45997c9a-39d6-4550-bb6f-051cc62a16de",
+        "priority": "high"
+      },
+      "passed": true,
+      "elapsed_ms": 11974,
+      "send_allowed": false
+    },
+    {
+      "case": "AT-02",
+      "http_status": 200,
+      "status": "decision_ready",
+      "intent": "handoff",
+      "reply": "Dame un momento y te confirmo.",
+      "action": {
+        "type": "propose_human_task",
+        "reason": "missing_information",
+        "question": "El cliente indica que no puede pagar sin factura. ¿Podemos emitir factura antes del pago para compras en la sede Santa Lucía? En caso afirmativo, indicar qué datos requiere el cliente (sin pedirlos por este canal), si hay condiciones o pasos adicionales y si procede prioridad alta porque bloquea la compra.",
+        "related_message_id": "9ba285b3-b71b-4817-b8c7-be2e072a9271",
+        "task_id": "",
+        "priority": "high"
+      },
+      "passed": true,
+      "elapsed_ms": 12600,
+      "send_allowed": false
+    }
+  ]
+}

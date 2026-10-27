@@ -1,4 +1,5 @@
 import {sendOperatorAlert} from './whatsapp-alerts.js';
+import {receiveIncomingMedia} from './whatsapp-incoming-media.js';
 import {handleWhatsApp,runWhatsAppJobs} from './whatsapp.js';
 const ORIGINS=['https://tiendasimportados.com','https://www.tiendasimportados.com','https://intranet.tiendasimportados.com'];
 const BRANCHES=['santa-lucia','niquia'];
@@ -37,7 +38,7 @@ export async function receivePqrs(request,env,origin){await rate(request,env,'pq
  if(!r.ok)reject(503,'No pudimos confirmar la recepción. Reintenta con los mismos datos.');const [saved]=await r.json();if(!saved)reject(503,'No pudimos confirmar la recepción.');return json({ok:true,case_number:saved.case_number,consultation_code:code},201,origin);
 }
 export async function lookupPqrs(request,env,origin){await rate(request,env,'pqrs-lookup');const body=await boundedJson(request);const number=field(body,'case_number',40),code=field(body,'consultation_code',32);await human(body,env,origin,'pqrs_lookup');if(!/^IMP-PQ-[0-9A-F]{12}$/.test(number)||!/^[0-9a-f]{32}$/i.test(code))reject(404,'No encontramos una solicitud con esos datos.');const r=await db(env,'pqrs_cases?case_number=eq.'+encodeURIComponent(number)+'&lookup_hash=eq.'+await sha(code)+'&select=case_number,subject,status,response_message,created_at,updated_at');if(!r.ok)reject(503,'No pudimos consultar la solicitud.');const [item]=await r.json();if(!item)reject(404,'No encontramos una solicitud con esos datos.');return json({ok:true,case:item},200,origin);}
-export default {async scheduled(_controller,env,ctx){ctx.waitUntil(Promise.allSettled([runWhatsAppJobs(env),sendOperatorAlert(env)]));},async fetch(request,env,ctx){const url=new URL(request.url),origin=request.headers.get('Origin'),allowed=ORIGINS.includes(origin);try{
+export default {async scheduled(_controller,env,ctx){ctx.waitUntil(Promise.allSettled([runWhatsAppJobs(env),sendOperatorAlert(env),receiveIncomingMedia(env)]));},async fetch(request,env,ctx){const url=new URL(request.url),origin=request.headers.get('Origin'),allowed=ORIGINS.includes(origin);try{
  if(url.pathname==='/health')return json({ok:true});
  if(url.pathname.startsWith('/api/')){
   if(origin&&!allowed)reject(403,'Origen no permitido.');
@@ -51,5 +52,5 @@ export default {async scheduled(_controller,env,ctx){ctx.waitUntil(Promise.allSe
   if(url.pathname==='/api/pqrs/lookup'&&request.method==='POST')return await lookupPqrs(request,env,origin);
   reject(404,'Ruta no encontrada.');
  }
- const response=await env.ASSETS.fetch(request);const h=new Headers(response.headers);h.set('X-Content-Type-Options','nosniff');h.set('Referrer-Policy','strict-origin-when-cross-origin');h.set('X-Frame-Options','DENY');h.set('X-Robots-Tag','noindex, nofollow');h.set('Cache-Control','no-cache');h.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://opeytkcqblgjfyvfjkwe.supabase.co; connect-src 'self' https://opeytkcqblgjfyvfjkwe.supabase.co wss://opeytkcqblgjfyvfjkwe.supabase.co; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");return new Response(response.body,{status:response.status,headers:h});
+ const response=await env.ASSETS.fetch(request);const h=new Headers(response.headers);h.set('X-Content-Type-Options','nosniff');h.set('Referrer-Policy','strict-origin-when-cross-origin');h.set('X-Frame-Options','DENY');h.set('X-Robots-Tag','noindex, nofollow');h.set('Cache-Control','no-cache');h.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://opeytkcqblgjfyvfjkwe.supabase.co; connect-src 'self' https://opeytkcqblgjfyvfjkwe.supabase.co wss://opeytkcqblgjfyvfjkwe.supabase.co; media-src 'self' blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");return new Response(response.body,{status:response.status,headers:h});
 }catch(error){return json({ok:false,message:error instanceof HttpError?error.message:'No pudimos completar la operación. Intenta nuevamente.'},error instanceof HttpError?error.status:503,allowed?origin:undefined);}}};

@@ -123,6 +123,21 @@ test('pilot generation allows 25 seconds and slow generation leaves delivery que
  finally{Date.now=previousNow;AbortSignal.timeout=previousTimeout;}
 });
 
+test('approved human answer preserves price, negation and conditions without depending on the model',async()=>{
+ const taskId=randomUUID(),messageId=randomUUID(),inboxId=randomUUID();const answer='Vale $49.900. No incluye domicilio y no hay descuento. Confirma la talla antes de comprar.';let committed=false;
+ await mocked((url,options)=>{
+  if(url.pathname==='/rest/v1/whatsapp_config')return response([cfg]);
+  if(url.pathname==='/rest/v1/rpc/whatsapp_claim_inbox')return response({id:inboxId,conversation_id:conversationId,kind:'human_resolution',event:{task_id:taskId},lease_token:randomUUID()});
+  if(url.pathname==='/rest/v1/whatsapp_conversations')return response([{...conversation,manual_paused:false}]);
+  if(url.pathname==='/rest/v1/whatsapp_messages')return response([{id:messageId,direction:'inbound',source:'customer',kind:'text',body:'Gracias, quedo pendiente.',created_at:new Date().toISOString()}]);
+  if(url.pathname==='/rest/v1/whatsapp_tasks')return response([{id:taskId,status:'resolved',branch_id:conversation.branch_id,question:'¿Qué vale producto A y hay descuento?',answer,source_message_id:randomUUID()}]);
+  const resource=resources(url);if(resource)return resource;
+  if(url.pathname==='/rest/v1/rpc/whatsapp_commit_reply'){assert.equal(JSON.parse(options.body).p_body,answer);committed=true;return response({outbox_id:randomUUID()});}
+  if(url.pathname==='/rest/v1/rpc/whatsapp_complete_inbox'){assert.equal(JSON.parse(options.body).p_outcome,'approved_answer_committed');return response(true);}
+  assert.fail('Approved answer unexpectedly depended on '+url.hostname);
+ },async()=>{await processInbox(liveEnv);assert.equal(committed,true);});
+});
+
 test('operator images stay private and send a verified Meta media ID rather than a public storage URL',async()=>{
  const assetId=randomUUID(),lease=randomUUID(),claim={id:randomUUID(),lease_token:lease,recipient:'573000000001',conversation_id:conversationId,kind:'image',media_asset_id:assetId,body:'Foto de producto'};
  const bytes=new Uint8Array([255,216,255,0]);let accepted=false;

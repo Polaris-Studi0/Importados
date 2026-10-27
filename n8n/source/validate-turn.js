@@ -57,7 +57,7 @@ const context = {
   customer:{name:txt(s.customer?.name,100)},history,products,information,qr_assets,last_options,cart,
   operator_instructions:instructions,human_resolution,
   onboarding_request:txt(s.onboarding_request,2000),
-  pending_tasks:(Array.isArray(s.pending_tasks)?s.pending_tasks:[]).filter(t=>uuid(t?.id)&&['pending','in_progress'].includes(t.status)&&txt(t.question,800)).slice(0,10).map(t=>({id:t.id,question:txt(t.question,800),status:t.status})),
+  pending_tasks:(Array.isArray(s.pending_tasks)?s.pending_tasks:[]).filter(t=>uuid(t?.id)&&['pending','in_progress'].includes(t.status)&&txt(t.question,800)).slice(0,10).map(t=>({id:t.id,question:txt(t.question,800),latest_question:txt(t.latest_question,800),kind:txt(t.kind,50),priority:t.priority==='high'?'high':'normal',revision:integer(t.revision)?t.revision:0,status:t.status})),
   checkout:object(s.checkout)?s.checkout:{},
   confirmed_answers:(Array.isArray(s.confirmed_answers)?s.confirmed_answers:[]).filter(a=>uuid(a?.id)&&txt(a?.answer,1800)).slice(0,10).map(a=>({id:a.id,question:txt(a.question,1000),answer:txt(a.answer,1800)})),
   payment:{ready_for_qr:s.payment?.ready_for_qr===true,quote_id:txt(s.payment?.quote_id,80)},

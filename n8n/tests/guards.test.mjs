@@ -16,6 +16,20 @@ function decision(context, output, tools = []) { return execute('validate-decisi
 const proposal = () => ({ intent: 'information', reply_text: 'Santa Lucía abre de 9:00 a. m. a 8:00 p. m.', product_ids: [], quote_items: [], qr_asset_id: '', human_reason: '', human_question: '', checkout: {}, confirmed_item: null, media_ids: [], accept_summary: false, cancel_cart: false });
 function safe(result) { const r = result.response; assert.equal(r.contract, 'importados.bot.decision.v1'); assert.equal(r.send_allowed, false); assert.equal(r.mutations_executed.length, 0); return r; }
 
+test('reclamo amplía solo un caso general real y conserva prioridad alta',()=>{
+ const b=fixture(),id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';b.snapshot.message.text='¿Otros dos días más? Lo necesito para mañana.';
+ b.snapshot.pending_tasks=[{id,status:'pending',kind:'missing_information',priority:'normal',question:'Disponibilidad y precio del producto A'}];
+ const c=validate(b).context,output={...proposal(),intent:'handoff',reply_text:'Revisaremos.',human_reason:'pqrs',human_question:'Reclama por demora y necesita el producto A mañana.',human_task_id:id,human_priority:'high'};
+ const r=safe(decision(c,output));assert.equal(r.status,'decision_ready');assert.equal(r.decision.actions[0].task_id,id);assert.equal(r.decision.actions[0].priority,'high');assert.match(r.decision.reply_text,/Lamento la demora/);
+ assert.equal(safe(decision(c,{...output,human_task_id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'})).status,'invalid_task_update');
+ c.pending_tasks[0].kind='payment_review';assert.equal(safe(decision(c,output)).status,'invalid_task_update');
+});
+
+test('cortesía pendiente conserva silencio real aunque se llame al modelo',()=>{
+ const b=fixture();b.snapshot.message.text='Okey yo espero';b.snapshot.pending_tasks=[];
+ const r=safe(decision(validate(b).context,{...proposal(),intent:'clarification',reply_text:'Te contesto por aquí.'}));assert.equal(r.decision.reply_text,'');assert.equal(r.decision.actions.length,0);
+});
+
 test('acepta contexto sintético propio con memoria acotada', () => { const v = validate(fixture()); assert.equal(v.allow_ai, true); assert.equal(v.context.branch.name, 'Santa Lucía'); assert.ok(v.llm_input.includes('memoria autorizada')); });
 for (const [name, change, expected] of [
   ['control manual', b => b.snapshot.control.manual_paused = true, 'manual_control'],

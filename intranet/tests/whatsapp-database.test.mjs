@@ -17,13 +17,13 @@ function event(phone,text='Consulta sintética',extra={}){const n=++counter;retu
 async function incoming(phone,text,extra={}){return rpc('whatsapp_receive_event',[JSON.stringify(event(phone,text,extra))]);}
 async function conversation(id){return (await db.query('select * from public.whatsapp_conversations where id=$1',[id])).rows[0];}
 async function action(id,name,payload={},request=randomUUID(),expected){const c=await conversation(id);return rpc('whatsapp_staff_action',[ids.admin,id,name,request,expected??c.control_version,JSON.stringify(payload)]);}
-async function authorize(initial,phone){
+async function authorize(initial,phone,acceptance='YO ACEPTO'){
  const c=await conversation(initial.conversation_id);const meta='wamid.synthetic.auth.'+randomUUID();
  const queued=await rpc('whatsapp_commit_reply',[c.id,initial.message_id,c.control_version,c.context_version,randomUUID(),'Aviso sintético https://tiendasimportados.com/privacidad-prueba-sintetica','privacy_notice',null]);
  const claim=await rpc('whatsapp_claim_outbox');assert.equal(claim.id,queued.outbox_id);
  await rpc('whatsapp_finish_outbox',[claim.id,claim.lease_token,'sent',meta,null]);
  await rpc('whatsapp_receive_event',[JSON.stringify(event(null,'',{event_type:'status',meta_message_id:meta,status:'delivered'}))]);
- return incoming(phone,'YO ACEPTO');
+ return incoming(phone,acceptance);
 }
 
 before(async()=>{
@@ -41,6 +41,7 @@ before(async()=>{
  const migration=await readFile(new URL('../supabase/202610200001_whatsapp.sql',import.meta.url),'utf8');await db.exec(migration);await db.exec(migration);
  const receiptCorrection=await readFile(new URL('../supabase/202610210001_whatsapp_privacy_receipts.sql',import.meta.url),'utf8');await db.exec(receiptCorrection);await db.exec(receiptCorrection);
  const operator=await readFile(new URL('../supabase/202610210002_whatsapp_operator_media_alerts.sql',import.meta.url),'utf8');await db.exec(operator);await db.exec(operator);
+ const attention=await readFile(new URL('../supabase/202610270001_whatsapp_attention_attachments.sql',import.meta.url),'utf8');await db.exec(attention);await db.exec(attention);
  for(const id of Object.values(ids))await db.query('insert into auth.users(id) values($1)',[id]);
  await db.query(`insert into public.profiles(id,full_name,role,branch_id,active) values
  ($1,'Admin sintético','admin',null,true),($2,'Caja Santa sintética','cashier','santa-lucia',true),
@@ -179,4 +180,59 @@ test('new human requests queue one alert and wait for a session or approved temp
  const claim=await rpc('whatsapp_claim_operator_alert',[false,true]);assert.equal(claim.use_template,true);
  await rpc('whatsapp_finish_operator_alert',[claim.id,claim.lease_token,'uncertain',null,'synthetic_network_unknown']);assert.equal(await rpc('whatsapp_claim_operator_alert',[true,true]),null);
  await assert.rejects(user(ids.admin,'select * from public.whatsapp_operator_alerts'),/permission denied/);
+});
+
+test('general cases keep the original, append idempotent details, never lower priority, and reject foreign cases',async()=>{
+ const phone='573000000801',first=await incoming(phone,'¿Tienen producto A y cuánto vale?');await authorize(first,phone);
+ await action(first.conversation_id,'assign_branch',{branch_id:'santa-lucia'});
+ const question=await incoming(phone,'¿Tienen producto A y cuánto vale?');let c=await conversation(first.conversation_id);
+ await rpc('whatsapp_commit_reply',[c.id,question.message_id,c.control_version,c.context_version,randomUUID(),'Dame un momento.','reply',JSON.stringify({kind:'missing_information',question:'Disponibilidad y precio de producto A'})]);
+ let task=(await db.query('select * from whatsapp_tasks where conversation_id=$1',[c.id])).rows[0];
+ const original=task.question,update=await incoming(phone,'¿Otros dos días más? Lo necesito para mañana.');c=await conversation(c.id);
+ const request=randomUUID(),args=[c.id,update.message_id,c.control_version,c.context_version,request,'Lamento la demora.','reply',JSON.stringify({kind:'pqrs',task_id:task.id,priority:'high',question:'Reclama por demora; necesita producto A para mañana, pendiente disponibilidad y precio.'})];
+ const a=await rpc('whatsapp_commit_reply',args),b=await rpc('whatsapp_commit_reply',args);assert.equal(a.outbox_id,b.outbox_id);
+ task=(await db.query('select * from whatsapp_tasks where id=$1',[task.id])).rows[0];
+ assert.equal(task.question,original);assert.equal(task.priority,'high');assert.equal(task.revision,1);assert.match(task.latest_question,/mañana/);
+ assert.equal((await db.query('select count(*)::int n from whatsapp_task_updates where task_id=$1',[task.id])).rows[0].n,1);
+ assert.equal((await db.query('select count(*)::int n from whatsapp_operator_alerts where task_id=$1',[task.id])).rows[0].n,1);
+ assert.equal((await conversation(c.id)).manual_paused,false);
+ const next=await incoming(phone,'Ahora necesito tres unidades.');c=await conversation(c.id);
+ await rpc('whatsapp_commit_reply',[c.id,next.message_id,c.control_version,c.context_version,randomUUID(),'Actualizamos la cantidad.','reply',JSON.stringify({kind:'missing_information',task_id:task.id,priority:'normal',question:'Solicita tres unidades del mismo producto A.'})]);
+ assert.equal((await db.query('select priority from whatsapp_tasks where id=$1',[task.id])).rows[0].priority,'high');
+ await db.query("update whatsapp_outbox set status='cancelled' where status='queued'");
+ const stranger=await incoming('573000000802','Otra consulta');await authorize(stranger,'573000000802');await action(stranger.conversation_id,'assign_branch',{branch_id:'santa-lucia'});const foreign=await incoming('573000000802','Quiero cambiar un caso ajeno');const other=await conversation(foreign.conversation_id);
+ await assert.rejects(rpc('whatsapp_commit_reply',[other.id,foreign.message_id,other.control_version,other.context_version,randomUUID(),'No debe guardarse.','reply',JSON.stringify({kind:'pqrs',task_id:task.id,priority:'high',question:'Caso ajeno'})]),/fuera del contexto/);
+});
+
+test('incoming attachments are private, leased once and associated with the exact recent consultation',async()=>{
+ await db.query("update whatsapp_outbox set status='cancelled' where status='queued'");
+ const phone='573000000803',first=await incoming(phone,'Busco producto sintético');await authorize(first,phone);await action(first.conversation_id,'assign_branch',{branch_id:'santa-lucia'});
+ const q=await incoming(phone,'Disponibilidad del producto sintético');const c=await conversation(q.conversation_id);
+ await rpc('whatsapp_commit_reply',[c.id,q.message_id,c.control_version,c.context_version,randomUUID(),'Vamos a confirmar.','reply',JSON.stringify({kind:'stock_check',question:'Disponibilidad del producto sintético'})]);
+ const image=await incoming(phone,'',{kind:'image',attachment:{id:'123456789987654',kind:'image',persisted:false}});
+ await assert.rejects(user(ids.admin,'select * from whatsapp_incoming_media'),/permission denied/);
+ await assert.rejects(user(ids.admin,'select public.whatsapp_claim_incoming_media($1)',[image.message_id]),/permission denied/);
+ const claim=await rpc('whatsapp_claim_incoming_media',[image.message_id]);assert.equal(claim.message_id,image.message_id);
+ assert.equal(await rpc('whatsapp_claim_incoming_media',[image.message_id]),null);
+ assert.equal(await rpc('whatsapp_link_incoming_reference',[image.message_id]),null);
+ const metadata={storage_path:c.id+'/'+image.message_id,mime_type:'image/png',size_bytes:100,sha256:'a'.repeat(64)};
+ assert.equal(await rpc('whatsapp_finish_incoming_media',[image.message_id,randomUUID(),'stored',JSON.stringify(metadata)]),false);
+ assert.equal(await rpc('whatsapp_finish_incoming_media',[image.message_id,claim.lease_token,'stored',JSON.stringify(metadata)]),true);
+ const task=await rpc('whatsapp_link_incoming_reference',[image.message_id]);assert.ok(task);assert.equal(await rpc('whatsapp_link_incoming_reference',[image.message_id]),task);
+ assert.equal((await db.query('select attachment from whatsapp_messages where id=$1',[image.message_id])).rows[0].attachment.persisted,true);
+ assert.equal((await db.query('select count(*)::int n from whatsapp_tasks where conversation_id=$1',[c.id])).rows[0].n,1);
+ const notAuthorized=await incoming('573000000804','',{kind:'document',attachment:{id:'123456789123456',persisted:false}});
+ assert.equal(await rpc('whatsapp_claim_incoming_media',[notAuthorized.message_id]),null);
+ assert.equal((await db.query("select public from storage.buckets where id='whatsapp-incoming-media'")).rows[0].public,false);
+});
+
+
+test('contextual Sí requires a delivered notice and No acepto revokes rather than granting',async()=>{
+ await db.query("update whatsapp_outbox set status='cancelled' where status='queued'");
+ const phone='573000000805',first=await incoming(phone,'Sí');
+ assert.equal((await conversation(first.conversation_id)).consent_status,'unknown');
+ await authorize(first,phone,'Sí');
+ assert.equal((await conversation(first.conversation_id)).consent_status,'granted');
+ await incoming(phone,'No acepto');
+ assert.equal((await conversation(first.conversation_id)).consent_status,'revoked');
 });

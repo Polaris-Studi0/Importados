@@ -26,7 +26,7 @@ export async function normalizeWebhook(payload,cfg){
     const kind=typeof message.type==='string'?message.type:'unknown';
     const text=kind==='text'?message.text?.body:kind==='button'?message.button?.text:kind==='interactive'?(message.interactive?.button_reply?.title||message.interactive?.list_reply?.title):message[kind]?.caption;
     if(text!==undefined&&(typeof text!=='string'||text.length>6000))fail(400,'Mensaje demasiado extenso.');
-    const attachment=['image','audio','document','video','sticker'].includes(kind)&&typeof message[kind]?.id==='string'?{id:message[kind].id,kind,mime_type:message[kind].mime_type||null,filename:message[kind].filename?.slice(0,180)||null,persisted:true}:null;
+    const attachment=['image','audio','document','video','sticker'].includes(kind)&&/^\d{5,30}$/.test(message[kind]?.id||'')?{id:message[kind].id,kind,mime_type:message[kind].mime_type||null,filename:message[kind].filename?.slice(0,180)||null,persisted:false}:null;
     const contact=(value.contacts||[]).find(item=>contactMatches(item,message,identity));
     events.push({event_key:await digest(['message',entry.id,cfg.phone_number_id,message.id]),event_type:'message',waba_id:entry.id,phone_number_id:cfg.phone_number_id,identity_key:identity.id,customer_phone:identity.phone,customer_bsuid:identity.bsuid,customer_name:contact?.profile?.name?.slice(0,120)||null,meta_message_id:message.id,body:text||'',kind,attachment,occurred_at:new Date(time).toISOString()});
    }

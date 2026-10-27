@@ -6,5 +6,8 @@ if (!q || typeof q!=='object' || Array.isArray(q)) return JSON.stringify({status
 const available = p => p.active && p.stock_verified && p.available_quantity>0 && Date.parse(p.stock_valid_until)>Date.now() && (!p.offer_starts_at||Date.parse(p.offer_starts_at)<=Date.now()) && (!p.offer_ends_at||Date.parse(p.offer_ends_at)>Date.now());
 const reasons=['human_request','missing_information','stock_check','payment_review','pqrs'];
 if(!reasons.includes(q.reason)||typeof q.question!=='string'||!q.question.trim()) return JSON.stringify({status:'invalid_arguments'});
-return JSON.stringify({status:'handoff_proposal',reason:q.reason,question:q.question.trim().slice(0,800),related_message_id:c.message.id,registered:false,notified:false});
+const taskId=q.task_id||'';
+if(typeof taskId!=='string'||q.priority!==undefined&&!['normal','high'].includes(q.priority))return JSON.stringify({status:'invalid_arguments'});
+if(taskId&&!c.pending_tasks?.some(t=>t.id===taskId&&['human_request','missing_information','stock_check','pqrs'].includes(t.kind)&&q.reason!=='payment_review'))return JSON.stringify({status:'invalid_task_update'});
+return JSON.stringify({task_id:taskId,priority:q.priority||'normal',status:'handoff_proposal',reason:q.reason,question:q.question.trim().slice(0,800),related_message_id:c.message.id,registered:false,notified:false});
 
