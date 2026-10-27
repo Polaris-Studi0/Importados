@@ -1,6 +1,6 @@
-/* Santa Lucía: marcador de Google Maps compartido por el propietario (13/10/2026).
-   Niquía: referencia del cruce 55 / Avenida 33, OpenStreetMap nodo 600814200.
-   La entrada de Niquía sigue pendiente del pin definitivo del propietario. */
+/* Pines compartidos por el propietario. Niquía: ubicación enlazada por @tiendasimportados en Instagram.
+   Dirección, horario y apertura confirmados el 27/10/2026.
+   Las rutas de Niquía usan la dirección completa; la distancia usa el punto compartido como referencia aproximada. */
 globalThis.ImportadosBranches = Object.freeze([
   Object.freeze({
     id: 'santa-lucia', name: 'Santa Lucía', city: 'medellin',
@@ -9,7 +9,7 @@ globalThis.ImportadosBranches = Object.freeze([
   }),
   Object.freeze({
     id: 'niquia', name: 'Niquía', city: 'bello',
-    address: 'Dg. 55 con Avenida 33, Bello, Antioquia, Colombia',
-    lat: 6.3409011, lng: -75.5410679, open: false, approximate: true
+    address: 'Diagonal 55 Av 38-33, edificio Valkiria, Niquía, Bello, Antioquia, Colombia',
+    lat: 6.3392231, lng: -75.5456356, open: true, approximate: true, directionsByAddress: true
   })
 ]);

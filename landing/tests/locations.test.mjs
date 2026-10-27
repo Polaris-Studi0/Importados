@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const source = fs.readFileSync(new URL('../dist/locations.js', import.meta.url), 'utf8');
 const BRANCHES = [
   { id: 'santa-lucia', city: 'medellin', name: 'Santa Lucía', address: 'Cr. 87 # 47 DD 50', lat: 6.258786, lng: -75.6038704, open: true },
-  { id: 'niquia', city: 'bello', name: 'Niquía', address: 'Dg. 55 AV 33, Bello, Antioquia, Colombia', lat: 6.3409011, lng: -75.5410679, open: false, approximate: true }
+  { id: 'niquia', city: 'bello', name: 'Niquía', address: 'Diagonal 55 Av 38-33, edificio Valkiria, Niquía, Bello, Antioquia, Colombia', lat: 6.3392231, lng: -75.5456356, open: true, approximate: true, directionsByAddress:true }
 ];
 
 class Element {
@@ -90,9 +90,9 @@ test('Maps uses a valid destination pin or encoded address, without the visitor 
   assert.equal(pin.searchParams.get('destination'), '6.258786,-75.6038704');
   assert.equal(pin.searchParams.has('origin'), false); assert.equal(pin.searchParams.has('key'), false);
   const address = new URL(api.directionsUrl({ ...BRANCHES[1], lat: null, lng: null }));
-  assert.equal(address.searchParams.get('destination'), 'Dg. 55 AV 33, Bello, Antioquia, Colombia');
+  assert.equal(address.searchParams.get('destination'), 'Diagonal 55 Av 38-33, edificio Valkiria, Niquía, Bello, Antioquia, Colombia');
   assert.equal(address.hash, '');
-  const shortAddress = new URL(api.directionsUrl({ ...BRANCHES[1], address: 'Dg. 55 AV 33', lat: null, lng: null }));
+  const shortAddress = new URL(api.directionsUrl({ ...BRANCHES[1], address: 'Diagonal 55 Av 38-33, edificio Valkiria, Niquía', lat: null, lng: null }));
   assert.equal(shortAddress.searchParams.get('destination'), address.searchParams.get('destination'));
   assert.equal(api.directionsUrl({ lat: null, lng: null }), '');
 });
@@ -110,14 +110,15 @@ test('initialization never requests location; an explicit click shows distances 
   assert.match(view.hint.textContent, /sin enviarla ni guardarla/);
 });
 
-test('a nearby upcoming branch remains labelled unopened and suggests the available Santa Lucia branch', () => {
+test('the corrected Niquía reference is open, remains approximate and routes to the complete building address', () => {
   const view = fixture(); view.api.initFinder(); view.button.click(); view.requests[0].success(position(BRANCHES[1]));
   assert.equal(view.badges[1].hidden, false); assert.equal(view.cards[1].classList.contains('active-location'), true);
   assert.equal(view.cities[1].getAttribute('aria-pressed'), 'true');
-  assert.match(view.result.textContent, /Niquía/); assert.match(view.result.textContent, /Apertura muy pronto/);
-  assert.match(view.result.textContent, /Santa Lucía, disponible a .+ en línea recta/);
+  assert.match(view.result.textContent, /Niquía/); assert.match(view.result.textContent, /Ya puedes visitarnos/);
+  assert.doesNotMatch(view.result.textContent, /Apertura muy pronto/);
+  assert.match(new URL(view.api.directionsUrl(BRANCHES[1])).searchParams.get('destination'),/38-33.*Valkiria/);
   assert.match(view.result.textContent, /La referencia más cercana/);
-  assert.match(view.result.textContent, /entrada exacta de Niquía está por confirmar/);
+  assert.match(view.result.textContent, /referencia cercana a Niquía/);
 });
 
 test('denied, unavailable, timed-out and invalid locations reset busy state and allow retry', () => {

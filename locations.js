@@ -25,7 +25,7 @@
   function directionsUrl(branch) {
     if (!branch) return '';
     let destination;
-    if (validCoordinates(branch.lat, branch.lng)) destination = `${branch.lat},${branch.lng}`;
+    if (!branch.directionsByAddress && validCoordinates(branch.lat, branch.lng)) destination = `${branch.lat},${branch.lng}`;
     else {
       if (typeof branch.address !== 'string' || !branch.address.trim()) return '';
       const parts = branch.address.split(',').map(part => part.trim()).filter(Boolean);
@@ -156,7 +156,7 @@
         const alternative = ranked.find(branch => branch.open === true);
         if (alternative) message += ` Mientras tanto, te esperamos en ${alternative.name}, disponible a ${formatDistance(alternative.distanceMeters)} en línea recta.`;
       }
-      if (nearest.approximate) message += ` La entrada exacta de ${nearest.name} está por confirmar.`;
+      if (nearest.approximate) message += ` Calculamos desde una referencia cercana a ${nearest.name}; abre Google Maps para llegar a la dirección completa.`;
       setText(result, message);
     }
 
