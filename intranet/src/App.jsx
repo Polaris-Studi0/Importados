@@ -317,7 +317,7 @@ function App(){
   const [couriers,setCouriers] = useState([]);
   const [staff,setStaff] = useState([]);
   const [events,setEvents] = useState([]);
-  const [page,setPage] = useState("orders");
+  const [page,setPage] = useState(()=>new URLSearchParams(window.location.search).has("whatsapp")?"whatsapp":"orders");
   const [internalBranch,setInternalBranch]=useState(null);
   const openInternalChat=useCallback(branch=>{setInternalBranch(branch);setPage("internalChat");},[]);
   const chat=useBranchChat(profile,profile?.role==="cashier"?profile.branch_id:internalBranch,page==="internalChat",openInternalChat);

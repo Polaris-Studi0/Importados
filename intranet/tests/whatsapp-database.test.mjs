@@ -40,6 +40,7 @@ before(async()=>{
  await db.exec(await readFile(new URL('../supabase/202610120002_intranet.sql',import.meta.url),'utf8'));
  const migration=await readFile(new URL('../supabase/202610200001_whatsapp.sql',import.meta.url),'utf8');await db.exec(migration);await db.exec(migration);
  const receiptCorrection=await readFile(new URL('../supabase/202610210001_whatsapp_privacy_receipts.sql',import.meta.url),'utf8');await db.exec(receiptCorrection);await db.exec(receiptCorrection);
+ const operator=await readFile(new URL('../supabase/202610210002_whatsapp_operator_media_alerts.sql',import.meta.url),'utf8');await db.exec(operator);await db.exec(operator);
  for(const id of Object.values(ids))await db.query('insert into auth.users(id) values($1)',[id]);
  await db.query(`insert into public.profiles(id,full_name,role,branch_id,active) values
  ($1,'Admin sintético','admin',null,true),($2,'Caja Santa sintética','cashier','santa-lucia',true),
@@ -100,7 +101,7 @@ test('staff actions use versions and request idempotency and cancel queued work 
  const row=await conversation(c.conversation_id);
  await rpc('whatsapp_commit_reply',[row.id,accepted.message_id,row.control_version,row.context_version,randomUUID(),'Respuesta sintética','reply',null]);
  await action(row.id,'pause');
- assert.equal((await db.query('select status from public.whatsapp_outbox where conversation_id=$1',[row.id])).rows[0].status,'cancelled');
+ assert.equal((await db.query("select status from public.whatsapp_outbox where conversation_id=$1 and purpose='reply'",[row.id])).rows[0].status,'cancelled');
 });
 test('consent requires the current full notice to have a delivered/read receipt',async()=>{
  const initial=await incoming('573000000010','YO ACEPTO');let c=await conversation(initial.conversation_id);assert.equal(c.consent_status,'unknown');
@@ -154,4 +155,28 @@ test('late privacy receipts cannot authorize a replacement version or restore a 
  await incoming('573000000014','NO AUTORIZO');
  await rpc('whatsapp_receive_event',[JSON.stringify(event(null,'',{event_type:'status',meta_message_id:'wamid.synthetic.new-notice',status:'read'}))]);
  await incoming('573000000014','YO ACEPTO');c=await conversation(c.id);assert.equal(c.consent_status,'revoked');assert.equal(c.privacy_notice_id,null);assert.equal(c.privacy_notice_delivered_at,null);
+});
+
+test('operator photo is scoped, requires takeover and authorization, and commits one durable image',async()=>{
+ await db.exec("update public.whatsapp_config set privacy_version='synthetic-v1'");
+ const initial=await incoming('573000000015');await authorize(initial,'573000000015');
+ const media=randomUUID();await db.query("insert into public.whatsapp_operator_media values($1,$2,$3,'synthetic/private.jpg','image/jpeg',64,repeat('a',64),'producto.jpg',now())",[media,initial.conversation_id,ids.admin]);
+ await assert.rejects(action(initial.conversation_id,'send_image',{media_id:media}),/control manual/);
+ await action(initial.conversation_id,'pause');
+ const request=randomUUID();const c=await conversation(initial.conversation_id);
+ const sent=await action(c.id,'send_image',{media_id:media,text:'Foto confirmada'},request,c.control_version);
+ assert.deepEqual(await action(c.id,'send_image',{media_id:media,text:'Foto confirmada'},request,c.control_version),sent);
+ const claim=await rpc('whatsapp_claim_outbox');assert.equal(claim.id,sent.outbox.id);assert.equal(claim.kind,'image');assert.equal(claim.media_asset_id,media);
+ await rpc('whatsapp_finish_outbox',[claim.id,claim.lease_token,'sent','wamid.synthetic.photo',null]);
+ const message=(await db.query('select kind,attachment from public.whatsapp_messages where meta_message_id=$1',['wamid.synthetic.photo'])).rows[0];assert.equal(message.kind,'image');assert.equal(message.attachment.asset_id,media);
+ await assert.rejects(user(ids.santa,'select * from public.whatsapp_operator_media'),/permission denied/);
+});
+test('new human requests queue one alert and wait for a session or approved template without sending twice',async()=>{
+ await db.exec("update public.whatsapp_operator_alerts set status='cancelled' where status='queued'");
+ const c=await incoming('573000000016');await rpc('whatsapp_record_issue',[c.conversation_id,c.message_id,c.inbox_id]);await rpc('whatsapp_record_issue',[c.conversation_id,c.message_id,c.inbox_id]);
+ assert.equal((await db.query("select count(*)::int as n from public.whatsapp_operator_alerts where status='queued'")).rows[0].n,1);
+ assert.equal(await rpc('whatsapp_claim_operator_alert',[false,false]),null);
+ const claim=await rpc('whatsapp_claim_operator_alert',[false,true]);assert.equal(claim.use_template,true);
+ await rpc('whatsapp_finish_operator_alert',[claim.id,claim.lease_token,'uncertain',null,'synthetic_network_unknown']);assert.equal(await rpc('whatsapp_claim_operator_alert',[true,true]),null);
+ await assert.rejects(user(ids.admin,'select * from public.whatsapp_operator_alerts'),/permission denied/);
 });

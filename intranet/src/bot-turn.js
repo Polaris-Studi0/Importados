@@ -1,3 +1,4 @@
+import {prepareOperatorImage} from './whatsapp-media.js';
 import {configuration,db,digest,fail,readiness,rpc,uuid,validWorkflowUrl} from './whatsapp-core.js';
 
 const BRANCH_IDS=['santa-lucia','niquia'];
@@ -180,9 +181,11 @@ export async function sendOne(env){
  // The claim revalidates the latest manual/privacy/window guards in one transaction.
  // An HTTP error with a structured Meta rejection is definite; network/timeouts and
  // malformed successes are uncertain and must never be automatically retried.
+ let media=null;
+ if(claim.kind==='image'){try{media=await prepareOperatorImage(env,claim);}catch{await finish('failed',null,'media_upload_failed');return {sent:false,reason:'media_upload_failed'};}}
  let response;
  try{
-  response=await fetch('https://graph.facebook.com/'+env.WHATSAPP_GRAPH_VERSION+'/'+env.WHATSAPP_PHONE_NUMBER_ID+'/messages',{method:'POST',headers:{Authorization:'Bearer '+env.WHATSAPP_ACCESS_TOKEN,'Content-Type':'application/json'},body:JSON.stringify({messaging_product:'whatsapp',recipient_type:'individual',...(isPhone?{to:claim.recipient}:{recipient:claim.recipient}),type:'text',text:{preview_url:false,body:claim.body}}),signal:AbortSignal.timeout(15000)});
+  response=await fetch('https://graph.facebook.com/'+env.WHATSAPP_GRAPH_VERSION+'/'+env.WHATSAPP_PHONE_NUMBER_ID+'/messages',{method:'POST',headers:{Authorization:'Bearer '+env.WHATSAPP_ACCESS_TOKEN,'Content-Type':'application/json'},body:JSON.stringify({messaging_product:'whatsapp',recipient_type:'individual',...(isPhone?{to:claim.recipient}:{recipient:claim.recipient}),...(media?{type:'image',image:media}:{type:'text',text:{preview_url:false,body:claim.body}})}),signal:AbortSignal.timeout(media?10000:15000)});
  }catch{await finish('uncertain',null,'network_outcome_unknown');return {sent:false,reason:'uncertain'};}
  let result;try{result=await response.json();}catch{await finish('uncertain',null,'provider_outcome_unknown');return {sent:false,reason:'uncertain'};}
  if(!response.ok){const definite=typeof result?.error?.code==='number'&&response.status>=400&&response.status<500;await finish(definite?'failed':'uncertain',null,definite?'provider_rejected':'provider_outcome_unknown');return {sent:false,reason:definite?'failed':'uncertain'};}

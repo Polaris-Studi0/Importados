@@ -32,7 +32,7 @@ test('cashier lists are branch scoped and a foreign detail leaks no messages, ta
  await mocked(url=>authHandler(url,'cashier')||(url.pathname==='/rest/v1/whatsapp_conversations'?response([{...conversation,branch_id:'niquia'}]):assert.fail('Foreign scope leaked '+url.pathname)),async()=>{assert.equal((await worker.fetch(request('/api/whatsapp/conversations/'+conversationId,{headers:auth}),env)).status,404);});
 });
 test('status describes disabled live paths and private workflow configuration without exposing credentials',async()=>{
- await mocked(url=>authHandler(url)||(url.pathname==='/rest/v1/whatsapp_config'?response([{...cfg,ingress_enabled:false,ai_enabled:false,outbound_enabled:false,phone_number_id:null,waba_id:null,privacy_url:null,public_since:null}]):url.pathname==='/rest/v1/whatsapp_tasks'?response([]):assert.fail(url.href)),async()=>{const result=await worker.fetch(request('/api/whatsapp/status',{headers:auth}),env);assert.equal(result.status,200);const data=await result.json();assert.equal(data.channel.enabled,false);assert.equal(data.automation.enabled,false);assert.equal(data.automation.configured,true);assert.equal(data.capabilities.manual_send,false);assert.ok(data.blockers.length);assert.equal(JSON.stringify(data).includes(env.N8N_WEBHOOK_SECRET),false);assert.equal(JSON.stringify(data).includes(env.SUPABASE_SERVICE_KEY),false);});
+ await mocked(url=>authHandler(url)||(url.pathname==='/rest/v1/whatsapp_config'?response([{...cfg,ingress_enabled:false,ai_enabled:false,outbound_enabled:false,phone_number_id:null,waba_id:null,privacy_url:null,public_since:null}]):['/rest/v1/whatsapp_tasks','/rest/v1/whatsapp_operator_alerts'].includes(url.pathname)?response([]):assert.fail(url.href)),async()=>{const result=await worker.fetch(request('/api/whatsapp/status',{headers:auth}),env);assert.equal(result.status,200);const data=await result.json();assert.equal(data.channel.enabled,false);assert.equal(data.automation.enabled,false);assert.equal(data.automation.configured,true);assert.equal(data.capabilities.manual_send,false);assert.ok(data.blockers.length);assert.equal(JSON.stringify(data).includes(env.N8N_WEBHOOK_SECRET),false);assert.equal(JSON.stringify(data).includes(env.SUPABASE_SERVICE_KEY),false);});
 });
 test('manual send cannot reach the outbox or Meta while runtime flags are disabled',async()=>{
  await mocked(url=>authHandler(url)||(url.pathname==='/rest/v1/whatsapp_config'?response([cfg]):url.pathname==='/rest/v1/whatsapp_conversations'?response([conversation]):assert.fail('Send escaped the runtime gate: '+url.href)),async()=>{const result=await worker.fetch(request('/api/whatsapp/conversations/'+conversationId+'/actions',{method:'POST',headers:auth,body:{action:'send',request_id:randomUUID(),expected_control_version:1,text:'Mensaje sintético'}}),env);assert.equal(result.status,409);});
@@ -99,7 +99,7 @@ test('quiet courtesies create no model call, task or outbound message and preser
   if(url.pathname==='/rest/v1/rpc/whatsapp_claim_inbox')return response({id:inboxId,conversation_id:conversationId,kind:'message',lease_token:randomUUID()});
   if(url.pathname==='/rest/v1/whatsapp_conversations')return response([{...conversation,manual_paused:false}]);
   if(url.pathname==='/rest/v1/whatsapp_messages')return response(url.searchParams.has('inbox_id')?[{id:messageId}]:[{id:messageId,direction:'inbound',source:'customer',kind:'text',body:state.message.text,created_at:new Date().toISOString()}]);
-  if(url.pathname==='/rest/v1/whatsapp_tasks')return response([]);
+  if(['/rest/v1/whatsapp_tasks','/rest/v1/whatsapp_operator_alerts'].includes(url.pathname))return response([]);
   const resource=resources(url);if(resource)return resource;
   assert.equal(url.pathname,'/rest/v1/rpc/whatsapp_complete_inbox','A courtesy attempted an external or mutating action');assert.equal(JSON.parse(options.body).p_outcome,'quiet_acknowledgement');return response(true);
  },async()=>assert.equal((await processInbox(liveEnv)).reason,'quiet_acknowledgement'));
@@ -121,4 +121,39 @@ test('pilot generation allows 25 seconds and slow generation leaves delivery que
   assert.equal(url.pathname,'/rest/v1/rpc/whatsapp_complete_inbox');return response(true);
  },async()=>{await runWhatsAppJobs(liveEnv);assert.equal(timeout,25000);assert.equal(commits,1);assert.equal(metaClaims,1,'Slow generation must not claim a new Meta delivery near the background cutoff');});}
  finally{Date.now=previousNow;AbortSignal.timeout=previousTimeout;}
+});
+
+test('operator images stay private and send a verified Meta media ID rather than a public storage URL',async()=>{
+ const assetId=randomUUID(),lease=randomUUID(),claim={id:randomUUID(),lease_token:lease,recipient:'573000000001',conversation_id:conversationId,kind:'image',media_asset_id:assetId,body:'Foto de producto'};
+ const bytes=new Uint8Array([255,216,255,0]);let accepted=false;
+ await mocked((url,options)=>{
+  if(url.pathname==='/rest/v1/whatsapp_config')return response([cfg]);
+  if(url.pathname==='/rest/v1/rpc/whatsapp_claim_outbox')return response(claim);
+  if(url.pathname==='/rest/v1/whatsapp_operator_media')return response([{id:assetId,conversation_id:conversationId,storage_path:conversationId+'/synthetic.jpg',mime_type:'image/jpeg',filename:'producto.jpg',size_bytes:bytes.length}]);
+  if(url.pathname.startsWith('/storage/v1/object/whatsapp-operator-media/')){assert.equal(options.headers.apikey,env.SUPABASE_SERVICE_KEY);return new Response(bytes);}
+  if(url.hostname==='graph.facebook.com'&&url.pathname.endsWith('/media')){assert.ok(options.body instanceof FormData);return response({id:'12345678912345'});}
+  if(url.hostname==='graph.facebook.com'&&url.pathname.endsWith('/messages')){const body=JSON.parse(options.body);assert.equal(body.type,'image');assert.equal(body.image.id,'12345678912345');assert.equal(body.image.link,undefined);accepted=true;return response({messages:[{id:'wamid.synthetic.image'}]});}
+  if(url.pathname==='/rest/v1/rpc/whatsapp_finish_outbox'){assert.equal(JSON.parse(options.body).p_status,'sent');return response(true);}
+  assert.fail(url.href);
+ },async()=>{assert.equal((await sendOne(liveEnv)).sent,true);assert.equal(accepted,true);});
+});
+test('operator alerts wait for approval outside the recipient window and disclose no customer transcript',async()=>{
+ const {sendOperatorAlert}=await import('../src/whatsapp-alerts.js');const e={...liveEnv,WHATSAPP_OPERATOR_PHONE:'573000000099'};
+ await mocked((url,options)=>{
+  if(url.pathname==='/rest/v1/whatsapp_config')return response([cfg]);
+  if(url.pathname==='/rest/v1/whatsapp_operator_alerts')return response([{id:randomUUID()}]);
+  if(url.pathname==='/rest/v1/whatsapp_conversations')return response([]);
+  if(url.hostname==='graph.facebook.com'&&url.pathname.endsWith('/message_templates'))return response({data:[{name:'importados_consulta_pendiente_v1',language:'es',status:'PENDING'}]});
+  if(url.pathname==='/rest/v1/rpc/whatsapp_claim_operator_alert'){assert.deepEqual(JSON.parse(options.body),{p_window:false,p_template:false});return response(null);}
+  assert.fail('No recipient window: '+url.href);
+ },async()=>{assert.equal((await sendOperatorAlert(e)).sent,false);});
+ await mocked((url,options)=>{
+  if(url.pathname==='/rest/v1/whatsapp_config')return response([cfg]);
+  if(url.pathname==='/rest/v1/whatsapp_operator_alerts')return response([{id:randomUUID()}]);
+  if(url.pathname==='/rest/v1/whatsapp_conversations')return response([{last_customer_at:new Date().toISOString()}]);
+  if(url.pathname==='/rest/v1/rpc/whatsapp_claim_operator_alert')return response({id:randomUUID(),lease_token:randomUUID(),conversation_id:conversationId,branch_id:'santa-lucia',use_template:false});
+  if(url.hostname==='graph.facebook.com'&&url.pathname.endsWith('/messages')){const body=JSON.parse(options.body);assert.equal(body.to,e.WHATSAPP_OPERATOR_PHONE);assert.match(body.text.body,/Consulta pendiente/);assert.ok(body.text.body.includes(conversationId));return response({messages:[{id:'wamid.synthetic.alert'}]});}
+  if(url.pathname==='/rest/v1/rpc/whatsapp_finish_operator_alert'){assert.equal(JSON.parse(options.body).p_status,'sent');return response(true);}
+  assert.fail(url.href);
+ },async()=>{assert.equal((await sendOperatorAlert(e)).sent,true);});
 });

@@ -1,7 +1,7 @@
 // All Importados database access stays on the server. No service credential reaches n8n.
 export const SUPABASE_ORIGIN='https://opeytkcqblgjfyvfjkwe.supabase.co';
 export const APP_ID='1378513457688529';
-export const NUMBER='+573147899067';
+export const NUMBER='+573127062214';
 export class WhatsAppError extends Error {constructor(status,message){super(message);this.status=status;}}
 export const fail=(status,message)=>{throw new WhatsAppError(status,message);};
 export const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -11,7 +11,7 @@ export const reply=(data,status=200,origin)=>new Response(JSON.stringify(data),{
 export async function db(env,path,options={}){
  if(env.SUPABASE_URL!==SUPABASE_ORIGIN||!env.SUPABASE_SERVICE_KEY)fail(503,'El servicio de Importados no está disponible.');
  const result=await fetch(SUPABASE_ORIGIN+'/rest/v1/'+path,{...options,headers:{apikey:env.SUPABASE_SERVICE_KEY,Authorization:'Bearer '+env.SUPABASE_SERVICE_KEY,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(15000)});
- if(!result.ok)fail(result.status===404?503:result.status===400?409:503,'No pudimos completar la operación de WhatsApp. Actualiza la conversación antes de intentar de nuevo.');
+ if(!result.ok){const error=await result.json().catch(()=>null);if(error?.code==='P0001')fail(409,/^(La conversación cambió|El envío requiere|Foto no disponible|Pendiente no disponible|Agrega una respuesta|Mensaje inválido|Identificador reutilizado)/.test(error.message||'')?error.message:'No se pudo completar esta acción. Actualiza la conversación.');fail(result.status===404?503:result.status===400?409:503,'No pudimos completar la operación de WhatsApp. Actualiza la conversación antes de intentar de nuevo.');}
  return result.status===204?null:result.json();
 }
 export const rpc=(env,name,body={})=>db(env,'rpc/'+name,{method:'POST',body:JSON.stringify(body)});
