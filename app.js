@@ -4,6 +4,8 @@ const promotionSection = document.getElementById('promociones');
 const blackFriday = document.getElementById('black-friday');
 const raffle = document.getElementById('apertura');
 const promoBanner = document.querySelector('[data-promo-banner]');
+const promoPopup = document.getElementById('aviso-promociones');
+const popupDetails = promoPopup?.querySelector('[data-popup-details]');
 
 function updatePromotions() {
   const { blackFridayVisible, raffleVisible } = ImportadosDates.promotions();
@@ -20,9 +22,40 @@ function updatePromotions() {
   promoBanner.querySelector('b').textContent = blackFridayVisible
     ? 'Black Friday · 27 al 30 de noviembre'
     : raffleVisible ? 'Rifa de una moto · Sorteo el 24 de diciembre' : 'Encuentra tu sede';
+
+  if (promoPopup) {
+    promoPopup.querySelector('[data-popup-black-friday]').hidden = !blackFridayVisible;
+    promoPopup.querySelector('[data-popup-raffle]').hidden = !raffleVisible;
+    popupDetails.textContent = blackFridayVisible ? 'Ver promociones' : 'Ver cómo participar';
+    if (!showPromotions && promoPopup.open) promoPopup.close();
+  }
+
+  return showPromotions;
 }
 
-updatePromotions();
+if (updatePromotions() && typeof promoPopup?.showModal === 'function') {
+  const popupKey = 'importados:aviso-promociones-2026';
+  let alreadyShown = false;
+  try {
+    alreadyShown = sessionStorage.getItem(popupKey) === 'shown';
+  } catch {
+    // The announcement can still open if storage is blocked.
+  }
+
+  if (!alreadyShown) {
+    promoPopup.showModal();
+    try {
+      sessionStorage.setItem(popupKey, 'shown');
+    } catch {
+      // The close controls also work without storage.
+    }
+  }
+
+  promoPopup.addEventListener('click', event => {
+    if (event.target === promoPopup) promoPopup.close();
+  });
+  popupDetails.addEventListener('click', () => promoPopup.close());
+}
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) updatePromotions();
 });

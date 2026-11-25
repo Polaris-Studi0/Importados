@@ -132,6 +132,58 @@
 .promo-steps li::marker { font-weight: 800; }
 .promotions-single .promo-grid { grid-template-columns: minmax(0, 740px); justify-content: center; }
 .promotions[hidden], .promo-card[hidden], .promo-location[hidden], [data-promo-link][hidden], [data-raffle-link][hidden] { display: none; }
+.promo-popup {
+  width: min(540px, calc(100% - 28px));
+  max-height: calc(100vh - 28px);
+  max-height: calc(100dvh - 28px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  color: var(--ink);
+  background: #fffcef;
+  border: 3px solid var(--yellow);
+  border-radius: 7px;
+}
+.promo-popup::backdrop { background: rgb(0 0 0 / .74); }
+html:has(.promo-popup[open]) { overflow: hidden; }
+.promo-popup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px clamp(16px, 5vw, 28px);
+  color: #fff;
+}
+.promo-popup-header h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.55rem, 5vw, 2.2rem);
+  line-height: 1.13;
+  letter-spacing: -.04em;
+}
+.promo-popup-close { flex-shrink: 0; color: var(--yellow); }
+.promo-popup-body {
+  display: grid;
+  gap: 10px;
+  padding: clamp(14px, 5vw, 26px);
+}
+.promo-popup-offer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e4d8ad;
+  border-radius: 5px;
+  background: #fff;
+}
+.promo-popup-offer[hidden] { display: none; }
+.promo-popup-black-friday { border-color: #f1dd82; background: #fff4c3; }
+.promo-popup-discount { font: 800 clamp(1.9rem, 7vw, 2.8rem)/1 var(--display); letter-spacing: -.055em; }
+.promo-popup-offer h3 { margin: 0 0 3px; font: 800 1.15rem/1.15 var(--display); }
+.promo-popup-offer p { margin: 0; font-size: .875rem; line-height: 1.45; }
+.promo-popup-offer p + p { margin-top: 3px; }
+.promo-popup-body > .button { justify-self: start; margin-top: 4px; }
 @media (max-width: 720px) {
   .promo-grid { grid-template-columns: minmax(0, 1fr); }
   .promo-card h2 { font-size: clamp(2.15rem, 8vw, 3rem); }

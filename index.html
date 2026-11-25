@@ -10,11 +10,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261125-promociones">
+  <link rel="stylesheet" href="styles.css?v=20261125-aviso">
   <script src="business-dates.js?v=20261125-promociones" defer></script>
   <script src="branches-data.js?v=20261027-contacto" defer></script>
   <script src="locations.js?v=20261027-contacto" defer></script>
-  <script src="app.js?v=20261125-promociones" defer></script>
+  <script src="app.js?v=20261125-aviso" defer></script>
   <script src="verification.js?v=20261027-contacto" defer></script>
   <script src="public-services.js?v=20261027-contacto" defer></script>
 </head>
@@ -51,7 +51,7 @@
       <div class="shell hero-bottom"><span>MEDELLÍN + BELLO</span><a href="#sedes">Estamos cerca de ti <svg class="icon" aria-hidden="true"><use href="#i-down"/></svg></a><span>BIENVENIDO A IMPORTADOS</span></div>
     </section>
     <div class="category-ribbon" aria-label="Categorías de productos"><div class="ribbon-content"><span>HOGAR</span><span class="ribbon-star" aria-hidden="true">✦</span><span>TECNOLOGÍA</span><span class="ribbon-star" aria-hidden="true">✦</span><span>BELLEZA</span><span class="ribbon-star" aria-hidden="true">✦</span><span>ACCESORIOS</span><span class="ribbon-star" aria-hidden="true">✦</span><span>VARIEDADES</span></div></div>
-    <section id="promociones" class="promotions section-space" aria-label="Promociones de Importados">
+    <section id="promociones" class="promotions section-space" aria-label="Promociones de Importados" tabindex="-1">
       <div class="shell promo-grid">
         <article id="black-friday" class="promo-card promo-black-friday corrugated" aria-labelledby="black-friday-title">
           <p class="promo-date">27 al 30 de noviembre de 2026</p>
@@ -82,6 +82,36 @@
         </div>
       </div>
     </section>
+    <dialog id="aviso-promociones" class="promo-popup" aria-labelledby="aviso-promociones-titulo">
+      <div class="promo-popup-content">
+        <header class="promo-popup-header corrugated">
+          <h2 id="aviso-promociones-titulo">Promociones de temporada</h2>
+          <form method="dialog">
+            <button class="icon-button promo-popup-close" aria-label="Cerrar aviso de promociones" autofocus>
+              <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+            </button>
+          </form>
+        </header>
+        <div class="promo-popup-body">
+          <div class="promo-popup-offer promo-popup-black-friday" data-popup-black-friday>
+            <span class="promo-popup-discount" aria-hidden="true">20%</span>
+            <div>
+              <h3>Black Friday</h3>
+              <p><strong>Del 27 al 30 de noviembre</strong></p>
+              <p>20 % de descuento en casi toda la tienda, en Santa Lucía y Niquía.</p>
+            </div>
+          </div>
+          <div class="promo-popup-offer" data-popup-raffle>
+            <div>
+              <h3>Rifa de una moto en Niquía</h3>
+              <p><strong>Sorteo el <time datetime="2026-12-24">24 de diciembre</time></strong></p>
+              <p>Compra por más de $100.000 en Niquía, pregunta cómo inscribirte y síguenos en Instagram.</p>
+            </div>
+          </div>
+          <a class="button button-yellow" href="#promociones" data-popup-details>Ver promociones</a>
+        </div>
+      </div>
+    </dialog>
     <section id="sedes" class="locations section-space">
       <div class="shell">
         <div class="section-heading reveal"><div><p class="eyebrow">A LA VUELTA DE LO QUE TE GUSTA</p><h2>Siempre hay una<br><span>nueva parada.</span></h2></div><p>Visítanos, mira de cerca<br>y encuentra tus nuevos favoritos.</p></div>
