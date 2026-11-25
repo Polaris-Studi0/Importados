@@ -18,7 +18,7 @@ export function observeAuthProfile({auth,loadProfile,onState,timeoutMs=15000}){
         const timeout=new Promise((_,reject)=>{deadline=setTimeout(()=>{reject(new Error('La conexión tardó demasiado. Vuelve a intentarlo.'));active.abort();},timeoutMs);});
         const profile=await Promise.race([loadProfile(user.id,active.signal),timeout]);
         if(!profile?.active)throw new Error('Tu usuario no está activo. Comunícate con administración.');
-        if(alive&&request===revision){currentProfile=profile;profileUserId=user.id;onState({profile,loading:false,error:'',user});}
+        if(alive&&request===revision){const same=currentProfile&&JSON.stringify(currentProfile)===JSON.stringify(profile);currentProfile=same?currentProfile:profile;profileUserId=user.id;onState({profile:currentProfile,loading:false,error:'',user});}
       }catch(error){
         if(alive&&request===revision){currentProfile=null;profileUserId=null;onState({profile:null,loading:false,error:`No pudimos cargar tu acceso. ${error.message||'Vuelve a intentarlo.'}`,user});}
       }finally{clearTimeout(deadline);if(controller===active)controller=null;}

@@ -61,3 +61,5 @@ export async function scopedConversation(env,profile,id){
  if(!conversation||!canAccess(profile,conversation))fail(404,'Conversación no encontrada.');return conversation;
 }
 export function canSend(env,cfg,c){const state=readiness(env,cfg);return state.outbound&&c.manual_paused&&c.status==='open'&&c.consent_status==='granted'&&c.consent_version===cfg.privacy_version&&Date.parse(c.last_customer_at)>Date.now()-86400000;}
+
+export function safeFilename(value,max=120){return Array.from(String(value||'archivo').replace(/[\\/"<>]/g,'_')).map(c=>c.charCodeAt(0)<32||c.charCodeAt(0)===127?'_':c).join('').slice(0,max);}

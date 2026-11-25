@@ -1,7 +1,11 @@
 (function(root){
   const celebration=Date.parse('2026-11-14T00:00:00-05:00');
   const celebrationEnd=Date.parse('2026-11-16T00:00:00-05:00');
-  root.ImportadosDates={celebration,celebrationEnd,phase(now=Date.now()){
+  const blackFridayEnd=Date.parse('2026-12-01T00:00:00-05:00');
+  const raffleEnd=Date.parse('2026-12-25T00:00:00-05:00');
+  root.ImportadosDates={celebration,celebrationEnd,promotions(now=Date.now()){
+    return {blackFridayVisible:now<blackFridayEnd,raffleVisible:now<raffleEnd};
+  },phase(now=Date.now()){
     return {open:true,celebrating:now>=celebration&&now<celebrationEnd,celebrated:now>=celebrationEnd,
       status:'NIQUÍA · YA PUEDES VISITARNOS',
       copy:'Ya estamos abiertos.',

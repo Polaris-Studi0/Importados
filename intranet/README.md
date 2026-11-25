@@ -16,6 +16,10 @@ Operación publicada en **https://intranet.tiendasimportados.com/**. Frontend Re
 - PQRS privadas, estado, notas internas y respuesta formal registrada. El cliente consulta con radicado y código secreto de 128 bits, además de verificación Turnstile.
 - Apartado WhatsApp: conversaciones y pendientes por sede, control manual, respuestas del equipo, asignación de sede y estados de envío. Administración dispone de una simulación sintética sin clientes ni envíos reales.
 
+## Calendario comercial
+
+Disponible para administración en **Calendario comercial** o `/?calendario=1`. Incluye 5 reels (4 orgánicos + 1 adicional para pauta), 15 posts/carruseles y 15 stories individuales alternadas con los posts diariamente del 4/11 al 3/12, guiones, textos, referencias y pendientes. Solo dos rodajes: jueves 5/11 confirmado y jueves 19/11 propuesto; R05 se propone publicar el 9/11. Permite editar piezas y generar enlaces de consulta revocables para los dueños, con vencimiento de 7/30/90 días. No publica automáticamente en Instagram. Detalles en `docs/COMMERCIAL_CALENDAR_20261103.md`.
+
 ## Primeros pasos
 
 1. Ingresa con `contact@polaris-studio.tech`. La invitación inicial se envió el 12/10/2026; la contraseña la configura personalmente el usuario.
@@ -28,9 +32,9 @@ Operación publicada en **https://intranet.tiendasimportados.com/**. Frontend Re
 
 ## Límites de esta versión
 
-WhatsApp tiene número registrado y recursos propios, secretos de Cloudflare y motor privado de n8n. Samuel aprobó y activó la atención el 21/10/2026 después de publicar privacidad, verificar el webhook y publicar la app en Meta. La recepción y entrega reales quedan pendientes de la prueba funcional de Samuel. Las campañas no están implementadas. El asistente deriva consultas comerciales al equipo: no reserva inventario, crea compras automáticas, envía QR ni aprueba pagos. Conserva referencias de adjuntos de Meta, sin descargarlos. Consulta `docs/n8n-intranet-2026-10-20.md`.
+WhatsApp opera con el número propio **+57 312 706 2214** y el motor privado de n8n. La revisión del 29/10/2026 conecta catálogo/fotos, captura conjunta de datos, revisiones humanas de existencias/domicilio/pago, QR privado, pedidos idempotentes y seguimiento. Atención diaria 09–20 y domicilios hasta las 19, Colombia; silencio para cortesías/reacciones y nueva sesión tras 24 horas sin mensajes. Control manual con fotos/PDF y avisos al responsable conservados. La recepción real del número se confirmó el 26/10; las nuevas compras requieren una prueba real con catálogo y QR propios. Ver [revisión completa](docs/BOT_PARITY_20261029.md). Las campañas y la facturación automática no están implementadas.
 
-Los conteos de inventario son manuales: guardar un pedido no reserva ni descuenta automáticamente existencias. Las respuestas de PQRS se consultan en la web; no se envían avisos automáticos por email o WhatsApp. Los estados de candidaturas son seguimiento del equipo, no decisiones automáticas de selección.
+Los conteos son manuales y se confirman por sede hasta el cierre del día. Las compras del bot reservan tras aceptar el resumen y descuentan unidades al registrar el pedido aprobado; los pedidos manuales requieren ajustar el conteo. Las respuestas de PQRS se consultan en la web; no se envían avisos automáticos por email o WhatsApp. Los estados de candidaturas son seguimiento del equipo, no decisiones automáticas de selección.
 
 No se cargaron productos, empleados, cargos ni pedidos ficticios en producción. Solo las dos sedes reales y el administrador solicitado. Las pruebas de permisos remotos se ejecutan con rollback; la demostración de interfaz usa memoria local.
 

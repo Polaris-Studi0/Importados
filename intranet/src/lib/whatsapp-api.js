@@ -34,8 +34,8 @@ export async function listWhatsAppTasks(signal) {
   if (!Array.isArray(result.tasks)) throw new Error("No pudimos leer las solicitudes. Actualiza para intentar de nuevo.");
   return result;
 }
-export async function getWhatsAppConversation(id, signal) {
-  const result = await request(`/conversations/${encodeURIComponent(id)}`, { signal });
+export async function getWhatsAppConversation(id, signal, before) {
+  const result = await request(`/conversations/${encodeURIComponent(id)}${before?"?before="+encodeURIComponent(before):""}`, { signal });
   if (!result.conversation || !Array.isArray(result.messages) || !Array.isArray(result.tasks)) throw new Error("No pudimos leer esta conversación. Actualiza para intentar de nuevo.");
   return result;
 }
@@ -58,3 +58,6 @@ export function getWhatsAppPhoto(conversationId,mediaId,signal) {
 export function getWhatsAppAttachment(conversationId,messageId,signal) {
  return request(`/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/attachment`,{binary:true,signal});
 }
+
+export function listPaymentAssets(signal){return request('/payment-assets',{signal});}
+export function savePaymentAsset(branchId,file,label,requestId,signal){const form=new FormData();form.set('branch_id',branchId);form.set('file',file);form.set('label',label);form.set('request_id',requestId);return request('/payment-assets',{form,signal});}

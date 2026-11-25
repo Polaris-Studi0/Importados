@@ -103,3 +103,37 @@
  .instagram-card-heading{padding:14px 16px;font-size:.65rem}
  .landing-footer .footer-bottom{padding-bottom:100px}
 }
+
+/* Promociones de temporada */
+.promotions { background: #f6f5ef; }
+.promo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(16px, 3vw, 32px); }
+.promo-location { display: flex; min-width: 0; }
+.promo-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: clamp(22px, 4.5vw, 55px);
+  border-radius: 6px;
+}
+.promo-black-friday { color: #fff; border: 1px solid #222; border-top: 5px solid var(--yellow); }
+.promo-raffle { width: 100%; border: 1px solid #ded8bf; border-top: 5px solid var(--yellow); background: #fffcef; color: var(--ink); }
+.promo-date { margin: 0 0 14px; font-size: .875rem; font-weight: 800; }
+.promo-black-friday .promo-date { color: var(--yellow); }
+.promo-card h2 { margin: 0 0 14px; font-family: var(--display); font-size: clamp(2.15rem, 4.2vw, 4.3rem); line-height: 1.02; letter-spacing: -.045em; }
+.promo-discount { margin: 0; color: var(--yellow); font-family: var(--display); font-size: clamp(5.5rem, 12vw, 10rem); font-weight: 800; line-height: .95; letter-spacing: -.085em; }
+.promo-discount span { font-size: .58em; letter-spacing: -.04em; margin-left: .05em; }
+.promo-description { margin: 8px 0 12px; font-size: clamp(1.125rem, 2.15vw, 1.45rem); font-weight: 800; }
+.promo-note { margin: 0 0 16px; font-size: 1rem; line-height: 1.55; }
+.promo-black-friday .promo-note { color: #ebebe5; }
+.promo-actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 10px; margin-top: auto; }
+.promo-instagram { border-color: #b6af94; color: var(--ink); background: #fff; }
+.promo-steps { margin: 0 0 16px; padding-left: 1.45rem; }
+.promo-steps li { padding-left: 4px; margin-bottom: 9px; }
+.promo-steps li::marker { font-weight: 800; }
+.promotions-single .promo-grid { grid-template-columns: minmax(0, 740px); justify-content: center; }
+.promotions[hidden], .promo-card[hidden], .promo-location[hidden], [data-promo-link][hidden], [data-raffle-link][hidden] { display: none; }
+@media (max-width: 720px) {
+  .promo-grid { grid-template-columns: minmax(0, 1fr); }
+  .promo-card h2 { font-size: clamp(2.15rem, 8vw, 3rem); }
+  .promo-actions .button { padding-inline: 16px; }
+}

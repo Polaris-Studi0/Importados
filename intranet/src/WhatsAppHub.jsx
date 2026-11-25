@@ -11,13 +11,31 @@ const dateTime = value => {
   const date = new Date(value);
   return value && !Number.isNaN(date.getTime()) ? new Intl.DateTimeFormat("es-CO", { dateStyle: "short", timeStyle: "short", timeZone: "America/Bogota" }).format(date) : "Sin fecha";
 };
+const mergeMessages=(oldMessages=[],newMessages=[])=>[...new Map([...oldMessages,...newMessages].map(m=>[m.id,m])).values()].sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at)||(a.sequence_id||0)-(b.sequence_id||0));
 const messageState = { received: "Recibido", queued: "En cola", pending: "Pendiente de envío", sending: "Enviando", uncertain: "Entrega por confirmar", sent: "Enviado", delivered: "Entregado", read: "Leído", failed: "Falló el envío", blocked: "Envío bloqueado", cancelled: "Cancelado" };
 
 function Empty({ title, children, symbol = "↔" }) {
   return <div className="wa-empty"><span aria-hidden="true">{symbol}</span><h3>{title}</h3><p>{children}</p></div>;
 }
 
-function TaskCard({ task, conversation, busy, onResolve, onOpen }) {
+function CheckoutReview({task,busy,onReview,reviewerRole}){
+ const [approved,setApproved]=useState('yes'),[fee,setFee]=useState(''),[eta,setEta]=useState(''),[answer,setAnswer]=useState(''),[revalidate,setRevalidate]=useState(false);
+ const payload=task.review_payload||{};
+ async function submit(e){e.preventDefault();const result={approved:approved==='yes',answer:answer.trim(),revalidate_expired:revalidate};if(task.review_type==='delivery'&&result.approved){result.delivery_fee_cop=Number(fee);result.eta_minutes=eta?Number(eta):null;}await onReview(task,result);}
+ if(task.review_type==="payment"&&reviewerRole!=="admin")return <p className="wa-muted">Administración debe validar este pago y autorizar el pedido.</p>;
+ return <form onSubmit={submit}>
+  {payload.items?.map((i,index)=><p key={index}><b>{i.quantity} × {i.name}</b>{i.variant?' · '+i.variant:''} · ${Number(i.unit_price_cop).toLocaleString('es-CO')} por unidad</p>)}
+  {payload.address&&<p><b>Dirección:</b> {payload.address} · {payload.zone}</p>}
+  {task.review_type==='payment'&&<p><b>Pago:</b> {payload.method} · Total ${Number(payload.total_cop).toLocaleString('es-CO')}. {payload.receipt_id?'Revisa el comprobante adjunto en el historial antes de aprobar.':'Revisa y autoriza personalmente esta modalidad antes de aprobar.'}</p>}
+  <label>{task.review_type==='stock'?'¿Confirmas estos artículos, precios y cantidades?':task.review_type==='delivery'?'¿Hay cobertura para esta dirección?':'¿Apruebas el pago o la recogida con pago en sede?'}<select value={approved} disabled={busy} onChange={e=>setApproved(e.target.value)}><option value="yes">Sí, confirmado por el equipo</option><option value="no">No, debemos aclararlo al cliente</option></select></label>
+  {task.review_type==='delivery'&&approved==='yes'&&<><label>Valor del domicilio (COP)<input required type="number" min="0" max="100000000" step="1" value={fee} onChange={e=>setFee(e.target.value)} disabled={busy}/></label><label>Tiempo estimado desde la confirmación (minutos, opcional)<input type="number" min="1" max="1440" value={eta} onChange={e=>setEta(e.target.value)} disabled={busy}/></label></>}
+  {task.review_type==='payment'&&approved==='yes'&&<label className="wa-check"><input type="checkbox" required checked={revalidate} onChange={e=>setRevalidate(e.target.checked)} disabled={busy}/>Confirmo el pago o la modalidad autorizada, los artículos, sus precios y las condiciones de entrega. Si la reserva venció, autorizo revalidarla con los mismos importes.</label>}
+  {approved==='no'&&<label>Información que debemos darle al cliente<textarea required minLength={2} maxLength={1800} value={answer} onChange={e=>setAnswer(e.target.value)} disabled={busy}/></label>}
+  <small>Esta confirmación queda registrada con tu usuario. El bot conserva el control manual si está activo.</small><button className="primary" disabled={busy}>{busy?'Guardando…':task.review_type==='payment'&&approved==='yes'?'Aprobar y registrar pedido':'Guardar confirmación'}</button>
+ </form>;
+}
+
+function TaskCard({ task, conversation, busy, onResolve, onReview, reviewerRole, onOpen }) {
   const [answer, setAnswer] = useState("");
   const open = pendingTask(task);
   async function submit(event) { event.preventDefault(); if (await onResolve(task, answer.trim())) setAnswer(""); }
@@ -29,16 +47,16 @@ function TaskCard({ task, conversation, busy, onResolve, onOpen }) {
     {task.updates?.length > 0 && <details className="wa-task-updates"><summary>Ampliaciones de la consulta ({task.revision})</summary>{task.updates.map(update=><div key={update.message_id}><small>{dateTime(update.created_at)}</small><p>{update.question}</p></div>)}</details>}
     {task.attachments?.length > 0 && <p className="wa-muted">Incluye una foto de referencia en el historial.</p>}
     <p className="wa-muted">{branchName(task.branch_id || conversation?.branch_id)}</p>
-    {open ? <form onSubmit={submit}><label>Respuesta del equipo<textarea value={answer} maxLength={4000} onChange={event => setAnswer(event.target.value)} placeholder="Confirma la información que necesita atención…" required disabled={busy}/></label><small>La respuesta queda registrada para continuar la atención del cliente.</small><button className="primary" disabled={busy || !answer.trim()}>{busy ? "Guardando…" : "Guardar respuesta"}</button></form> : <p className="wa-task-answer">{task.answer || "La solicitud ya fue atendida."}</p>}
+    {open && task.kind==="new_order" ? <button className="primary" disabled={busy} onClick={()=>onResolve(task,"Pedido revisado en la intranet.")}>Marcar como revisado</button> : open && task.review_type ? <CheckoutReview task={task} busy={busy} onReview={onReview} reviewerRole={reviewerRole}/> : open ? <form onSubmit={submit}><label>Respuesta del equipo<textarea value={answer} maxLength={4000} onChange={event => setAnswer(event.target.value)} placeholder="Confirma la información que necesita atención…" required disabled={busy}/></label><small>La respuesta queda registrada para continuar la atención del cliente.</small><button className="primary" disabled={busy || !answer.trim()}>{busy ? "Guardando…" : "Guardar respuesta"}</button></form> : <p className="wa-task-answer">{task.answer || "La solicitud ya fue atendida."}</p>}
   </article>;
 }
 
 function PhotoMessage({ conversationId, assetId }) {
- const [url,setUrl]=useState("");const [error,setError]=useState("");const [busy,setBusy]=useState(false);const active=useRef(null);
+ const [url,setUrl]=useState("");const [mime,setMime]=useState("");const [error,setError]=useState("");const [busy,setBusy]=useState(false);const active=useRef(null);
  useEffect(()=>()=>{active.current?.abort();},[]);
  useEffect(()=>()=>{if(url)URL.revokeObjectURL(url);},[url]);
- async function view(){const controller=new AbortController();active.current=controller;setBusy(true);setError("");try{const blob=await getWhatsAppPhoto(conversationId,assetId,controller.signal);if(!controller.signal.aborted)setUrl(URL.createObjectURL(blob));}catch(e){if(!controller.signal.aborted)setError(e.message);}finally{if(!controller.signal.aborted)setBusy(false);}}
- return <div className="wa-photo-message">{url?<a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt="Foto compartida por el equipo de Importados"/></a>:<button type="button" onClick={view} disabled={busy}>{busy?"Cargando foto…":"Ver foto enviada"}</button>}{error&&<small role="alert">{error}</small>}</div>;
+ async function view(){const controller=new AbortController();active.current=controller;setBusy(true);setError("");try{const blob=await getWhatsAppPhoto(conversationId,assetId,controller.signal);if(!controller.signal.aborted){setMime(blob.type);setUrl(URL.createObjectURL(blob));}}catch(e){if(!controller.signal.aborted)setError(e.message);}finally{if(!controller.signal.aborted)setBusy(false);}}
+ return <div className="wa-photo-message">{url?<a href={url} target="_blank" rel="noopener noreferrer">{mime==="application/pdf"?"Abrir PDF enviado ↗":<img src={url} alt="Foto compartida por el equipo de Importados"/>}</a>:<button type="button" onClick={view} disabled={busy}>{busy?"Cargando foto…":"Ver foto enviada"}</button>}{error&&<small role="alert">{error}</small>}</div>;
 }
 
 function IncomingAttachment({ conversationId, message }) {
@@ -52,7 +70,7 @@ function IncomingAttachment({ conversationId, message }) {
   catch(e){if(!controller.signal.aborted)setError(e.message);}
   finally{if(!controller.signal.aborted)setBusy(false);}
  }
- const name=message.attachment.filename||({image:"Imagen del cliente",audio:"Audio del cliente",video:"Video del cliente",sticker:"Sticker del cliente",document:"Documento del cliente"}[message.kind]||"Archivo del cliente");
+ const name=message.attachment.filename|| (message.attachment.bot_image?"Imagen compartida por Importados":null)||({image:"Imagen del cliente",audio:"Audio del cliente",video:"Video del cliente",sticker:"Sticker del cliente",document:"Documento del cliente"}[message.kind]||"Archivo del cliente");
  return <div className="wa-incoming-attachment"><b>{name}</b>{!file?<button type="button" disabled={busy} onClick={open}>{busy?"Preparando archivo…":error?"Volver a intentar":"Abrir archivo recibido"}</button>:<>
   {file.type.startsWith("image/")&&<a href={file.url} target="_blank" rel="noopener noreferrer"><img src={file.url} alt="Imagen enviada por el cliente"/></a>}
   {file.type.startsWith("audio/")&&<audio src={file.url} controls preload="metadata">Descarga el audio para escucharlo.</audio>}
@@ -71,6 +89,8 @@ function Conversation({ id, profile, onChanged, onBack }) {
   const [photo,setPhoto]=useState(null);
   const [photoPreview,setPhotoPreview]=useState("");
   const [uploading,setUploading]=useState(false);
+  const [olderBusy,setOlderBusy]=useState(false);
+  const [sessionOnly,setSessionOnly]=useState(true);
   const photoRequest=useRef(null);
   useEffect(()=>{if(!photo){setPhotoPreview("");return;}const url=URL.createObjectURL(photo);setPhotoPreview(url);return()=>URL.revokeObjectURL(url);},[photo]);
   const [branch, setBranch] = useState("");
@@ -80,7 +100,9 @@ function Conversation({ id, profile, onChanged, onBack }) {
   const readSequence = useRef(0);
   const actionInFlight = useRef(false);
   const actionController = useRef(null);
+  const pendingKey='importados-wa-pending:'+profile.id+':'+id;
   const pendingRequest = useRef(null);
+  useEffect(()=>{try{const saved=JSON.parse(sessionStorage.getItem(pendingKey)||'null');if(saved?.requestId&&saved?.conversation?.id===id){pendingRequest.current=saved;setPendingAction(saved);}}catch{/* Ignore invalid local metadata. */}},[pendingKey,id]);
   const refreshing = useRef(0);
   useEffect(() => { alive.current = true; return () => { alive.current = false; actionController.current?.abort(); }; }, []);
 
@@ -90,7 +112,7 @@ function Conversation({ id, profile, onChanged, onBack }) {
     const revision = refreshing.current;
     try {
       const result = await getWhatsAppConversation(id, signal);
-      if (alive.current && !signal?.aborted && sequence === readSequence.current && revision === refreshing.current) { setData(result); setError(""); }
+      if (alive.current && !signal?.aborted && sequence === readSequence.current && revision === refreshing.current) { setData(current=>({...result,messages:mergeMessages(current?.messages,result.messages),next_cursor:current?current.next_cursor:result.next_cursor})); setError(""); }
     } catch (loadError) { if (alive.current && !signal?.aborted && sequence === readSequence.current) { if ([403, 404].includes(loadError.status)) { setData(null); pendingRequest.current = null; setPendingAction(null); } setError(loadError.message); } }
     finally { if (alive.current && !signal?.aborted && sequence === readSequence.current) setLoading(false); }
   }, [id]);
@@ -120,45 +142,47 @@ function Conversation({ id, profile, onChanged, onBack }) {
           const current = await getWhatsAppConversation(id, controller.signal);
           if (!alive.current) return false;
           setData(current);
-          if (["send","send_image"].includes(values.action) && (current.can_send !== true || current.conversation.status === "closed" || current.conversation.consent_status === "revoked")) { setError("El envío ya no está disponible. Revisa el estado de esta conversación antes de continuar."); return false; }
+          if (["send","send_image","send_document"].includes(values.action) && (current.can_send !== true || current.conversation.status === "closed" || current.conversation.consent_status === "revoked")) { setError("El envío ya no está disponible. Revisa el estado de esta conversación antes de continuar."); return false; }
           currentConversation = current.conversation;
         }
         pendingRequest.current = { signature, values, conversation: currentConversation, requestId: crypto.randomUUID() };
+        try{sessionStorage.setItem(pendingKey,JSON.stringify(pendingRequest.current));}catch{/* In-memory request remains idempotent. */}
       }
       const pending = pendingRequest.current;
       const result = await actOnWhatsAppConversation(pending.conversation, { ...values, request_id: pending.requestId }, controller.signal);
       saved = true;
-      pendingRequest.current = null;
+      pendingRequest.current = null;try{sessionStorage.removeItem(pendingKey);}catch{/* Local storage may be unavailable. */}
       if (alive.current) setPendingAction(null);
-      if (["send","send_image"].includes(values.action) && alive.current) {setText("");setPhoto(null);photoRequest.current=null;}
+      if (["send","send_image","send_document"].includes(values.action) && alive.current) {setText("");setPhoto(null);photoRequest.current=null;}
       if (!alive.current) return false;
       if (result.conversation) setData(current => ({ ...current, conversation: result.conversation }));
       const latest = await getWhatsAppConversation(id, controller.signal);
       if (!alive.current) return false;
       setData(latest);
-      setNotice(["send","send_image"].includes(values.action) ? "Solicitud de envío registrada. Revisa su estado en la conversación." : values.action === "resolve_task" ? "Respuesta guardada." : values.action === "pause" ? "Atención automática pausada. El equipo tiene el control." : values.action === "resume" ? pending.conversation.status === "closed" ? "Atención reabierta. La atención automática podrá continuar cuando el canal esté disponible." : "Pausa retirada. La atención automática podrá continuar cuando el canal esté disponible." : values.action === "close" ? "Conversación cerrada." : "Sede actualizada.");
+      setNotice(["send","send_image","send_document"].includes(values.action) ? "Solicitud de envío registrada. Revisa su estado en la conversación." : values.action === "review_checkout" ? "Confirmación guardada." : values.action === "resolve_task" ? "Respuesta guardada." : values.action === "pause" ? "Atención automática pausada. El equipo tiene el control." : values.action === "resume" ? pending.conversation.status === "closed" ? "Atención reabierta. La atención automática podrá continuar cuando el canal esté disponible." : "Pausa retirada. La atención automática podrá continuar cuando el canal esté disponible." : values.action === "close" ? "Conversación cerrada." : "Sede actualizada.");
       setConfirmClose(false);
       onChanged();
       return true;
     } catch (actionError) {
-      if (!saved && actionError.confirmedRejection) { pendingRequest.current = null; if (alive.current) setPendingAction(null); }
+      if (!saved && actionError.confirmedRejection) { pendingRequest.current = null;try{sessionStorage.removeItem(pendingKey);}catch{/* No pending request. */} if (alive.current) setPendingAction(null); }
       else if (!saved && pendingRequest.current && alive.current) setPendingAction(pendingRequest.current);
       if (alive.current && !controller.signal.aborted) { setError(saved ? `La acción quedó registrada, pero no pudimos actualizar el historial: ${actionError.message}` : actionError.message); onChanged(); }
       return saved;
     } finally { actionInFlight.current = false; if (alive.current) setBusy(false); }
   }
 
+  async function loadOlder(){if(!data?.next_cursor||olderBusy)return;setOlderBusy(true);try{const result=await getWhatsAppConversation(id,undefined,data.next_cursor);if(alive.current)setData(current=>({...current,messages:mergeMessages(result.messages,current.messages),next_cursor:result.next_cursor}));}catch(e){if(alive.current)setError(e.message);}finally{if(alive.current)setOlderBusy(false);}}
   const conversation = data?.conversation;
   const canSend = data?.can_send === true && conversation?.status !== "closed" && conversation?.consent_status !== "revoked";
   const sendReason=conversation?.status==="closed"?"Reabre la conversación para continuar.":conversation?.consent_status!=="granted"?"El cliente debe autorizar primero el tratamiento de sus datos.":!conversation?.manual_paused?"Pulsa «Tomar control» para escribir o enviar fotos.":"El envío requiere un canal activo y un mensaje del cliente en las últimas 24 horas.";
   async function submitMessage(event){event.preventDefault();if(!canSend||busy||uploading||pendingAction)return;
    if(!photo){if(text.trim())await act({action:"send",text:text.trim()});return;}
    setUploading(true);setError("");const controller=new AbortController();actionController.current=controller;
-   try{if(!photoRequest.current?.asset){const result=await uploadWhatsAppPhoto(id,photo,photoRequest.current.id,controller.signal);photoRequest.current.asset=result.media.id;}if(alive.current)await act({action:"send_image",media_id:photoRequest.current.asset,text:text.trim()});}
+   try{if(!photoRequest.current?.asset){const result=await uploadWhatsAppPhoto(id,photo,photoRequest.current.id,controller.signal);photoRequest.current.asset=result.media.id;}if(alive.current)await act({action:photo.type==="application/pdf"?"send_document":"send_image",media_id:photoRequest.current.asset,text:text.trim()});}
    catch(e){if(alive.current&&!controller.signal.aborted)setError(e.message);}finally{if(alive.current)setUploading(false);}
   }
   const tasks = data?.tasks || [];
-  const messages = useMemo(() => [...(data?.messages || [])].sort((left, right) => new Date(left.created_at) - new Date(right.created_at)), [data?.messages]);
+  const messages = useMemo(() => mergeMessages([],data?.messages).filter(m=>!sessionOnly||Date.parse(m.created_at)>=Date.parse(data?.conversation?.session_started_at||0)), [data?.messages,data?.conversation?.session_started_at,sessionOnly]);
   return <section className="wa-conversation" aria-label="Conversación seleccionada" aria-busy={loading || busy}>
     <button className="wa-mobile-back wa-text-button" onClick={onBack}>← Conversaciones</button>
     {loading && !conversation ? <p className="wa-loading" role="status">Cargando conversación…</p> : null}
@@ -171,16 +195,16 @@ function Conversation({ id, profile, onChanged, onBack }) {
       {confirmClose && <div className="wa-confirm"><p>Se cerrará esta atención y se conservará su historial.</p><button disabled={busy} className="primary" onClick={() => act({ action: "close" })}>Confirmar cierre</button><button disabled={busy} onClick={() => setConfirmClose(false)}>Volver</button></div>}
       {profile.role === "admin" && <form className="wa-branch-form" onSubmit={event => { event.preventDefault(); void act({ action: "assign_branch", branch_id: branch }); }}><label>Asignar a sede<select value={branch} onChange={event => setBranch(event.target.value)} disabled={busy || uploading || Boolean(pendingAction)}><option value="">{branchName(conversation.branch_id)}</option>{BRANCHES.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button disabled={busy || uploading || Boolean(pendingAction) || !branch || branch === conversation.branch_id}>Guardar sede</button></form>}
       {conversation.consent_status === "revoked" && <p className="wa-warning">El cliente retiró su autorización. El envío de mensajes está bloqueado.</p>}
-      <div className="wa-messages" aria-label="Historial de mensajes">
+      <div className="wa-conversation-tools"><button aria-pressed={sessionOnly} onClick={()=>setSessionOnly(true)}>Atención actual</button><button aria-pressed={!sessionOnly} onClick={()=>setSessionOnly(false)}>Todo el historial</button></div><p className="wa-muted">Después de 24 horas sin mensajes del cliente se inicia una atención nueva, sin arrastrar sede ni compra anterior. El historial y los pedidos se conservan.</p><div className="wa-messages" aria-label="Historial de mensajes">{!sessionOnly&&data.next_cursor&&<button disabled={olderBusy} onClick={loadOlder}>{olderBusy?"Cargando…":"Cargar mensajes anteriores"}</button>}
         {data.limits?.messages_truncated && <p className="wa-muted wa-history-limit">Se muestran los últimos {data.limits.messages || 100} mensajes.</p>}
-        {!messages.length ? <Empty title="Sin mensajes registrados">El historial aparecerá aquí cuando se reciban mensajes del cliente.</Empty> : messages.map(message => <article key={message.id} className={`wa-message ${message.direction === "outbound" ? "outbound" : "inbound"}`}><small>{message.source === "operator" ? "Equipo Importados" : message.source === "assistant" ? "Atención automática" : "Cliente"}</small>{(message.body||!message.attachment)&&<p>{message.body || (message.kind === "text" ? "Mensaje sin texto" : "Mensaje sin vista previa")}</p>}{message.attachment?.asset_id && <PhotoMessage conversationId={id} assetId={message.attachment.asset_id}/>} {message.direction==="inbound"&&message.attachment?.id&&<IncomingAttachment conversationId={id} message={message}/>}<div><time dateTime={message.created_at}>{dateTime(message.created_at)}</time><span className={message.status === "failed" ? "wa-failed" : ""}>{messageState[message.status] || "Registrado"}</span></div></article>)}
+        {!messages.length ? <Empty title="Sin mensajes registrados">El historial aparecerá aquí cuando se reciban mensajes del cliente.</Empty> : messages.map(message => <article key={message.id} className={`wa-message ${message.direction === "outbound" ? "outbound" : "inbound"}`}><small>{message.source === "operator" ? "Equipo Importados" : message.source === "assistant" ? "Atención automática" : "Cliente"}</small>{(message.body||!message.attachment)&&<p>{message.body || (message.kind === "text" ? "Mensaje sin texto" : "Mensaje sin vista previa")}</p>}{message.attachment?.asset_id && <PhotoMessage conversationId={id} assetId={message.attachment.asset_id}/>} {(message.attachment?.bot_image||message.direction==="inbound"&&message.attachment?.id)&&<IncomingAttachment conversationId={id} message={message}/>}<div><time dateTime={message.created_at}>{dateTime(message.created_at)}</time><span className={message.status === "failed" ? "wa-failed" : ""}>{messageState[message.status] || "Registrado"}</span></div></article>)}
       </div>
       {!canSend && <p className="wa-warning">{sendReason}</p>}
-      <form className="wa-composer" onSubmit={submitMessage}><label>{photo?"Texto de la foto (opcional)":"Mensaje del equipo"}<textarea value={text} onChange={event => setText(event.target.value)} maxLength={photo?1024:4000} disabled={!canSend || busy || uploading || Boolean(pendingAction)} placeholder={canSend ? "Escribe la respuesta al cliente…" : sendReason}/></label>
-        <div className="wa-photo-controls"><label className={`wa-attach ${!canSend?"disabled":""}`}>Adjuntar foto<input type="file" accept="image/jpeg,image/png" disabled={!canSend||busy||uploading||Boolean(pendingAction)} onChange={event=>{const file=event.target.files?.[0];if(file&&(!["image/jpeg","image/png"].includes(file.type)||file.size>5*1024*1024)){setError("Elige una foto JPG o PNG de hasta 5 MB.");event.target.value="";return;}setPhoto(file||null);photoRequest.current=file?{id:crypto.randomUUID(),asset:null}:null;event.target.value="";}}/></label><small>JPG o PNG · máximo 5 MB</small></div>
-        {photo&&<div className="wa-selected-photo"><img src={photoPreview} alt="Foto seleccionada para enviar"/><span>{photo.name}</span><button type="button" disabled={busy||uploading||Boolean(pendingAction)} onClick={()=>{setPhoto(null);photoRequest.current=null;}}>Quitar foto</button></div>}
-        <div><small>{canSend ? "El estado del envío aparecerá en el historial." : sendReason}</small><button className="primary" disabled={!canSend||busy||uploading||Boolean(pendingAction)||(!photo&&!text.trim())}>{uploading?"Preparando foto…":busy?"Guardando…":photo?"Enviar foto":"Enviar mensaje"}</button></div></form>
-      {tasks.length > 0 && <section className="wa-conversation-tasks"><h3>Solicitudes al equipo <span>{tasks.filter(pendingTask).length} pendientes</span></h3>{data.limits?.tasks_truncated && <p className="wa-muted">Se muestran las últimas {data.limits.tasks || 100} solicitudes de esta conversación.</p>}{tasks.map(task => <TaskCard key={task.id} task={task} conversation={conversation} busy={busy || uploading || Boolean(pendingAction)} onResolve={(task, answer) => act({ action: "resolve_task", task_id: task.id, answer })}/>)}</section>}
+      <form className="wa-composer" onSubmit={submitMessage}><label>{photo?"Texto del archivo (opcional)":"Mensaje del equipo"}<textarea value={text} onChange={event => setText(event.target.value)} maxLength={photo?1024:4000} disabled={!canSend || busy || uploading || Boolean(pendingAction)} placeholder={canSend ? "Escribe la respuesta al cliente…" : sendReason}/></label>
+        <div className="wa-photo-controls"><label className={`wa-attach ${!canSend?"disabled":""}`}>Adjuntar foto o PDF<input type="file" accept="image/jpeg,image/png,application/pdf" disabled={!canSend||busy||uploading||Boolean(pendingAction)} onChange={event=>{const file=event.target.files?.[0];if(file&&(!["image/jpeg","image/png","application/pdf"].includes(file.type)||file.size>(file.type==="application/pdf"?10:5)*1024*1024)){setError("Elige un JPG/PNG de hasta 5 MB o un PDF de hasta 10 MB.");event.target.value="";return;}setPhoto(file||null);photoRequest.current=file?{id:crypto.randomUUID(),asset:null}:null;event.target.value="";}}/></label><small>JPG/PNG · 5 MB · PDF · 10 MB</small></div>
+        {photo&&<div className="wa-selected-photo">{photo.type==="application/pdf"?<a href={photoPreview} target="_blank" rel="noopener noreferrer">Revisar PDF ↗</a>:<img src={photoPreview} alt="Foto seleccionada para enviar"/>}<span>{photo.name}</span><button type="button" disabled={busy||uploading||Boolean(pendingAction)} onClick={()=>{setPhoto(null);photoRequest.current=null;}}>Quitar archivo</button></div>}
+        <div><small>{canSend ? "El estado del envío aparecerá en el historial." : sendReason}</small><button className="primary" disabled={!canSend||busy||uploading||Boolean(pendingAction)||(!photo&&!text.trim())}>{uploading?"Preparando foto…":busy?"Guardando…":photo?"Enviar archivo":"Enviar mensaje"}</button></div></form>
+      {tasks.length > 0 && <section className="wa-conversation-tasks"><h3>Solicitudes al equipo <span>{tasks.filter(pendingTask).length} pendientes</span></h3>{data.limits?.tasks_truncated && <p className="wa-muted">Se muestran las últimas {data.limits.tasks || 100} solicitudes de esta conversación.</p>}{tasks.map(task => <TaskCard key={task.id} task={task} reviewerRole={profile.role} conversation={conversation} busy={busy || uploading || Boolean(pendingAction)} onResolve={(task, answer) => act({ action: "resolve_task", task_id: task.id, answer })} onReview={(task,review_result)=>act({action:"review_checkout",task_id:task.id,review_result})}/>)}</section>}
     </>}
   </section>;
 }

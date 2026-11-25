@@ -1,3 +1,4 @@
+import {handleMarketing} from './marketing.js';
 import {sendOperatorAlert} from './whatsapp-alerts.js';
 import {receiveIncomingMedia} from './whatsapp-incoming-media.js';
 import {handleWhatsApp,runWhatsAppJobs} from './whatsapp.js';
@@ -43,6 +44,7 @@ export default {async scheduled(_controller,env,ctx){ctx.waitUntil(Promise.allSe
  if(url.pathname.startsWith('/api/')){
   if(origin&&!allowed)reject(403,'Origen no permitido.');
   if(request.method==='OPTIONS'){if(!allowed)reject(403,'Origen no permitido.');return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','Vary':'Origin'}});}
+  if(url.pathname.startsWith('/api/marketing/'))return await handleMarketing(request,env,allowed?origin:undefined,{requireAdmin,db,json,reject,boundedJson,rate});
   if(url.pathname.startsWith('/api/whatsapp/'))return await handleWhatsApp(request,env,allowed?origin:undefined,ctx);
   if(url.pathname==='/api/team')return await team(request,env,allowed?origin:undefined);
   if(url.pathname==='/api/public/config'&&request.method==='GET')return json({enabled:!!env.TURNSTILE_SECRET_KEY&&!!env.SUPABASE_SERVICE_KEY,siteKey:env.TURNSTILE_SITE_KEY},200,allowed?origin:undefined);
@@ -52,5 +54,5 @@ export default {async scheduled(_controller,env,ctx){ctx.waitUntil(Promise.allSe
   if(url.pathname==='/api/pqrs/lookup'&&request.method==='POST')return await lookupPqrs(request,env,origin);
   reject(404,'Ruta no encontrada.');
  }
- const response=await env.ASSETS.fetch(request);const h=new Headers(response.headers);h.set('X-Content-Type-Options','nosniff');h.set('Referrer-Policy','strict-origin-when-cross-origin');h.set('X-Frame-Options','DENY');h.set('X-Robots-Tag','noindex, nofollow');h.set('Cache-Control','no-cache');h.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://opeytkcqblgjfyvfjkwe.supabase.co; connect-src 'self' https://opeytkcqblgjfyvfjkwe.supabase.co wss://opeytkcqblgjfyvfjkwe.supabase.co; media-src 'self' blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");return new Response(response.body,{status:response.status,headers:h});
+ const response=await env.ASSETS.fetch(request);const h=new Headers(response.headers);h.set('X-Content-Type-Options','nosniff');h.set('Referrer-Policy',url.pathname.startsWith('/calendario-compartido')?'no-referrer':'strict-origin-when-cross-origin');h.set('X-Frame-Options','DENY');h.set('X-Robots-Tag','noindex, nofollow');h.set('Cache-Control','no-cache');h.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://opeytkcqblgjfyvfjkwe.supabase.co; connect-src 'self' https://opeytkcqblgjfyvfjkwe.supabase.co wss://opeytkcqblgjfyvfjkwe.supabase.co; media-src 'self' blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");return new Response(response.body,{status:response.status,headers:h});
 }catch(error){return json({ok:false,message:error instanceof HttpError?error.message:'No pudimos completar la operación. Intenta nuevamente.'},error instanceof HttpError?error.status:503,allowed?origin:undefined);}}};

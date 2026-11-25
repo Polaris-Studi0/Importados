@@ -1,3 +1,4 @@
+import {safeFilename} from './whatsapp-core.js';
 import {db,fail,readBytes,rpc,uuid,SUPABASE_ORIGIN} from './whatsapp-core.js';
 
 const BUCKET='whatsapp-incoming-media';
@@ -107,6 +108,6 @@ export async function viewIncomingMedia(env,conversation,messageId){
  const bytes=await readBytes(response,limit);
  const sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(n=>n.toString(16).padStart(2,'0')).join('');
  if(bytes.length!==file.size_bytes||sha!==file.sha256)fail(503,'No pudimos verificar el archivo.');
- const filename=String(file.filename||'archivo'+TYPES[type][1]).replace(/[\u0000-\u001f\u007f"\\/<>]/g,'_').slice(0,120);
+ const filename=safeFilename(file.filename||'archivo'+TYPES[type][1]);
  return new Response(bytes,{headers:{'Content-Type':type,'Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(filename),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox; default-src 'none'"}});
 }

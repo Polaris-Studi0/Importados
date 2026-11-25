@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createHmac,randomUUID} from 'node:crypto';
+import {createHmac,randomUUID,createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import worker from '../src/worker.js';
 import {callAssistant,processInbox,quietAcknowledgement,runWhatsAppJobs,sendOne,syntheticTurn,validateDecision} from '../src/bot-turn.js';
@@ -22,6 +22,7 @@ function signed(payload,secret=liveEnv.WHATSAPP_APP_SECRET){const body=JSON.stri
 function validResponse(packet,extra={}){return {contract:'importados.bot.decision.v1',status:'decision_ready',mode:packet.mode,source:packet.snapshot.source,turn_id:packet.turn_id,conversation_id:packet.conversation_id,expected_control_version:packet.control_version,expected_context_version:packet.context_version,expected_context_fingerprint:packet.context_fingerprint,expires_at:packet.snapshot.expires_at,send_allowed:false,requires_commit:true,mutations_executed:[],decision:{intent:'information',reply_text:'Respuesta sintética sin envío.',offered_product_ids:[],quote:null,actions:[],checkout:{},confirmed_item:null,accept_summary:false,cancel_cart:false,media_ids:[]},evidence:{tools_used:['consultar_informacion']},...extra};}
 function resources(url){if(url.pathname==='/rest/v1/branches')return response([{id:'santa-lucia',name:'Santa Lucía · Medellín',address:'Dirección confirmada de prueba',hours:'Horario confirmado de prueba'},{id:'niquia',name:'Niquía · Bello',address:'Dirección confirmada de prueba',hours:null}]);if(url.pathname==='/rest/v1/branch_knowledge')return response([{id:randomUUID(),topic:'Fuente sintética',content:'Información sintética autorizada.'}]);if(['/rest/v1/products','/rest/v1/branch_inventory'].includes(url.pathname))return response([]);return null;}
 
+function groupedSnapshot(message,tasks=[]){return {conversation:{...conversation,manual_paused:false},messages:[message],tasks,branches:[{id:'santa-lucia',name:'Santa Lucía · Medellín',address:'Dirección sintética',hours:'9 a. m.–8 p. m.'},{id:'niquia',name:'Niquía · Bello',address:'Otra dirección',hours:'9 a. m.–8 p. m.'}],knowledge:[],products:[],inventory:[],holds:[],checkout:null,qrs:[],resource_version:0,summary_delivered:false};}
 test('staff endpoints require a verified active profile and deny untrusted origins before private reads',async()=>{
  await mocked(()=>assert.fail('Private request without authentication'),async()=>{assert.equal((await worker.fetch(request('/api/whatsapp/conversations'),env)).status,401);assert.equal((await worker.fetch(request('/api/whatsapp/status',{headers:{Origin:'https://unrelated.invalid',...auth}}),env)).status,403);});
  await mocked(url=>authHandler(url,'admin',false)||assert.fail(url.href),async()=>{assert.equal((await worker.fetch(request('/api/whatsapp/conversations',{headers:auth}),env)).status,403);});
@@ -97,6 +98,7 @@ test('quiet courtesies create no model call, task or outbound message and preser
  await mocked((url,options)=>{
   if(url.pathname==='/rest/v1/whatsapp_config')return response([cfg]);
   if(url.pathname==='/rest/v1/rpc/whatsapp_claim_inbox')return response({id:inboxId,conversation_id:conversationId,kind:'message',lease_token:randomUUID()});
+  if(url.pathname==='/rest/v1/rpc/whatsapp_turn_snapshot')return response(groupedSnapshot({id:messageId,direction:'inbound',source:'customer',kind:'text',body:state.message.text,created_at:new Date().toISOString()}));
   if(url.pathname==='/rest/v1/whatsapp_conversations')return response([{...conversation,manual_paused:false}]);
   if(url.pathname==='/rest/v1/whatsapp_messages')return response(url.searchParams.has('inbox_id')?[{id:messageId}]:[{id:messageId,direction:'inbound',source:'customer',kind:'text',body:state.message.text,created_at:new Date().toISOString()}]);
   if(['/rest/v1/whatsapp_tasks','/rest/v1/whatsapp_operator_alerts'].includes(url.pathname))return response([]);
@@ -104,14 +106,26 @@ test('quiet courtesies create no model call, task or outbound message and preser
   assert.equal(url.pathname,'/rest/v1/rpc/whatsapp_complete_inbox','A courtesy attempted an external or mutating action');assert.equal(JSON.parse(options.body).p_outcome,'quiet_acknowledgement');return response(true);
  },async()=>assert.equal((await processInbox(liveEnv)).reason,'quiet_acknowledgement'));
 });
-test('pilot generation allows 25 seconds and slow generation leaves delivery queued for a later invocation',async()=>{
+test('a WhatsApp reaction stays silent even before consent and never becomes a file consultation',async()=>{
+ const messageId=randomUUID(),inboxId=randomUUID();
+ await mocked((url,options)=>{
+  if(url.pathname==='/rest/v1/whatsapp_config')return response([cfg]);
+  if(url.pathname==='/rest/v1/rpc/whatsapp_claim_inbox')return response({id:inboxId,conversation_id:conversationId,kind:'message',lease_token:randomUUID()});
+  if(url.pathname==='/rest/v1/rpc/whatsapp_turn_snapshot'){const d=groupedSnapshot({id:messageId,direction:'inbound',source:'customer',kind:'reaction',body:'',created_at:new Date().toISOString()});d.conversation.consent_status='unknown';return response(d);}
+  if(url.pathname==='/rest/v1/whatsapp_messages')return response([{id:messageId}]);
+  assert.equal(url.pathname,'/rest/v1/rpc/whatsapp_complete_inbox');assert.equal(JSON.parse(options.body).p_outcome,'quiet_reaction');return response(true);
+ },async()=>assert.equal((await processInbox(liveEnv)).reason,'quiet_reaction'));
+});
+test('pilot generation allows 18 seconds and slow generation leaves delivery queued for a later invocation',async()=>{
  const messageId=randomUUID(),inboxId=randomUUID();let elapsed=0,metaClaims=0,commits=0,timeout;
  const previousNow=Date.now,previousTimeout=AbortSignal.timeout;
- Date.now=()=>previousNow()+elapsed;AbortSignal.timeout=milliseconds=>{if(milliseconds===25000)timeout=milliseconds;return previousTimeout(milliseconds);};
+ Date.now=()=>previousNow()+elapsed;AbortSignal.timeout=milliseconds=>{if(milliseconds===18000)timeout=milliseconds;return previousTimeout(milliseconds);};
  try{await mocked((url,options)=>{
   if(url.pathname==='/rest/v1/whatsapp_config')return response([cfg]);
   if(url.pathname==='/rest/v1/rpc/whatsapp_claim_outbox'){metaClaims++;return response(null);}
   if(url.pathname==='/rest/v1/rpc/whatsapp_claim_inbox')return response({id:inboxId,conversation_id:conversationId,kind:'message',lease_token:randomUUID()});
+  if(url.pathname==='/rest/v1/rpc/whatsapp_prepare_reopening')return response(false);
+  if(url.pathname==='/rest/v1/rpc/whatsapp_turn_snapshot')return response(groupedSnapshot({id:messageId,direction:'inbound',source:'customer',kind:'text',body:'¿Dónde queda la sede?',created_at:'2026-10-21T00:00:00Z'}));
   if(url.pathname==='/rest/v1/whatsapp_conversations')return response([{...conversation,manual_paused:false}]);
   if(url.pathname==='/rest/v1/whatsapp_messages')return response(url.searchParams.has('inbox_id')?[{id:messageId}]:[{id:messageId,direction:'inbound',source:'customer',kind:'text',body:'¿Dónde queda la sede?',created_at:'2026-10-21T00:00:00Z'}]);
   if(url.pathname==='/rest/v1/whatsapp_tasks'||url.pathname==='/rest/v1/branch_knowledge')return response([]);
@@ -119,7 +133,7 @@ test('pilot generation allows 25 seconds and slow generation leaves delivery que
   if(url.href===env.N8N_BOT_WEBHOOK_URL){elapsed=24000;return response(validResponse(JSON.parse(options.body)));}
   if(url.pathname==='/rest/v1/rpc/whatsapp_commit_reply'){commits++;return response({outbox_id:randomUUID()});}
   assert.equal(url.pathname,'/rest/v1/rpc/whatsapp_complete_inbox');return response(true);
- },async()=>{await runWhatsAppJobs(liveEnv);assert.equal(timeout,25000);assert.equal(commits,1);assert.equal(metaClaims,1,'Slow generation must not claim a new Meta delivery near the background cutoff');});}
+ },async()=>{await runWhatsAppJobs(liveEnv);assert.equal(timeout,18000);assert.equal(commits,1);assert.equal(metaClaims,1,'Slow generation must not claim a new Meta delivery near the background cutoff');});}
  finally{Date.now=previousNow;AbortSignal.timeout=previousTimeout;}
 });
 
@@ -128,6 +142,7 @@ test('approved human answer preserves price, negation and conditions without dep
  await mocked((url,options)=>{
   if(url.pathname==='/rest/v1/whatsapp_config')return response([cfg]);
   if(url.pathname==='/rest/v1/rpc/whatsapp_claim_inbox')return response({id:inboxId,conversation_id:conversationId,kind:'human_resolution',event:{task_id:taskId},lease_token:randomUUID()});
+  if(url.pathname==='/rest/v1/rpc/whatsapp_turn_snapshot')return response(groupedSnapshot({id:messageId,direction:'inbound',source:'customer',kind:'text',body:'Gracias, quedo pendiente.',created_at:'2026-10-21T00:00:00Z'},[{id:taskId,status:'resolved',branch_id:conversation.branch_id,question:'¿Qué vale producto A y hay descuento?',answer,source_message_id:messageId}]));
   if(url.pathname==='/rest/v1/whatsapp_conversations')return response([{...conversation,manual_paused:false}]);
   if(url.pathname==='/rest/v1/whatsapp_messages')return response([{id:messageId,direction:'inbound',source:'customer',kind:'text',body:'Gracias, quedo pendiente.',created_at:new Date().toISOString()}]);
   if(url.pathname==='/rest/v1/whatsapp_tasks')return response([{id:taskId,status:'resolved',branch_id:conversation.branch_id,question:'¿Qué vale producto A y hay descuento?',answer,source_message_id:randomUUID()}]);
@@ -144,7 +159,7 @@ test('operator images stay private and send a verified Meta media ID rather than
  await mocked((url,options)=>{
   if(url.pathname==='/rest/v1/whatsapp_config')return response([cfg]);
   if(url.pathname==='/rest/v1/rpc/whatsapp_claim_outbox')return response(claim);
-  if(url.pathname==='/rest/v1/whatsapp_operator_media')return response([{id:assetId,conversation_id:conversationId,storage_path:conversationId+'/synthetic.jpg',mime_type:'image/jpeg',filename:'producto.jpg',size_bytes:bytes.length}]);
+  if(url.pathname==='/rest/v1/whatsapp_operator_media')return response([{id:assetId,conversation_id:conversationId,storage_path:conversationId+'/synthetic.jpg',mime_type:'image/jpeg',filename:'producto.jpg',size_bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}]);
   if(url.pathname.startsWith('/storage/v1/object/whatsapp-operator-media/')){assert.equal(options.headers.apikey,env.SUPABASE_SERVICE_KEY);return new Response(bytes);}
   if(url.hostname==='graph.facebook.com'&&url.pathname.endsWith('/media')){assert.ok(options.body instanceof FormData);return response({id:'12345678912345'});}
   if(url.hostname==='graph.facebook.com'&&url.pathname.endsWith('/messages')){const body=JSON.parse(options.body);assert.equal(body.type,'image');assert.equal(body.image.id,'12345678912345');assert.equal(body.image.link,undefined);accepted=true;return response({messages:[{id:'wamid.synthetic.image'}]});}

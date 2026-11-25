@@ -41,14 +41,23 @@ export async function saveProduct(product) {
     category: text(product.category, 100, "Categoría") || "General",
     description: text(product.description, 3000, "Descripción"),
     price,
+    regular_price: product.regular_price===''||product.regular_price==null?null:Number(product.regular_price),
+    offer_starts_at: product.offer_starts_at?new Date(/[Z]|[+-]\d\d:\d\d$/.test(product.offer_starts_at)?product.offer_starts_at:product.offer_starts_at+'-05:00').toISOString():null,
+    offer_ends_at: product.offer_ends_at?new Date(/[Z]|[+-]\d\d:\d\d$/.test(product.offer_ends_at)?product.offer_ends_at:product.offer_ends_at+'-05:00').toISOString():null,
     active: Boolean(product.active),
     storage_path: product.storage_path || null
   };
+  if(row.regular_price!==null&&(!Number.isSafeInteger(row.regular_price)||row.regular_price<row.price||row.regular_price>999999999))throw new Error('El precio regular debe ser igual o mayor al precio de venta.');
+  if(row.offer_starts_at&&row.offer_ends_at&&Date.parse(row.offer_starts_at)>=Date.parse(row.offer_ends_at))throw new Error('El fin de la promoción debe ser posterior al inicio.');
   const query = product.id ? client().from("products").update(row).eq("id", product.id) : client().from("products").insert(row);
   return check(await query.select().single());
 }
 
 export async function uploadProductImage(file) {
+  if(file?.type==='image/webp'){
+    const bitmap=await createImageBitmap(file);const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.getContext('2d').drawImage(bitmap,0,0);bitmap.close();
+    const converted=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.9));if(!converted)throw new Error('No pudimos preparar la imagen. Usa un JPG o PNG.');file=new File([converted],file.name.replace(/\.webp$/i,'.jpg'),{type:'image/jpeg'});
+  }
   const extension = IMAGE_TYPES.get(file?.type);
   if (!extension || !file.size || file.size > MAX_IMAGE_BYTES) throw new Error("Selecciona una imagen JPG, PNG o WebP de máximo 5 MB.");
   const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());

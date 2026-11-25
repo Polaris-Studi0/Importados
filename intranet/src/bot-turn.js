@@ -1,13 +1,14 @@
+import {commerceSnapshot,directConversationReply,commitCommerce,queueProductImages,hasCommerce,prepareBotImage,approvedReply,asksBranches,asksChangeBranch,branchMenu,branchFromText,serviceOpen} from './bot-commerce.js';
+import {intakeRequest,intakeControl} from './bot-intake.js';
 import {prepareOperatorImage} from './whatsapp-media.js';
 import {receiveIncomingMedia} from './whatsapp-incoming-media.js';
 import {configuration,db,digest,fail,readiness,rpc,uuid,validWorkflowUrl} from './whatsapp-core.js';
 
-const BRANCH_IDS=['santa-lucia','niquia'];
 const clean=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
-export function selectedBranch(text){const value=clean(text);if(/^(?:sede\s+)?(?:1|santa lucia|santa-lucia|medellin)$/.test(value))return 'santa-lucia';if(/^(?:sede\s+)?(?:2|niquia|bello)$/.test(value))return 'niquia';return null;}
-const controlText=text=>/^(?:si|(?:yo\s+)?(?:si\s+)?acepto)$/.test(clean(text))||!!selectedBranch(text)||/^(hola|buenas|buenos dias|buenas tardes|buenas noches)[!. ]*$/.test(clean(text));
+const BRANCH_IDS=['santa-lucia','niquia'];
+export const selectedBranch=branchFromText;
 export function quietAcknowledgement(snapshot){
- if(snapshot.message?.kind!=='text'||snapshot.human_resolution||snapshot.cart?.length||snapshot.checkout?.cart?.length||snapshot.checkout?.pending_selection)return false;
+ if(snapshot.message?.kind!=='text'||snapshot.human_resolution||(!['stock_review','fee_review','payment_review','ordered','cancelled'].includes(snapshot.checkout?.stage)&&(snapshot.cart?.length||snapshot.checkout?.cart?.length||snapshot.checkout?.pending_selection)))return false;
  const body=String(snapshot.message.text||'');if(/[?¿]/.test(body))return false;
  const lastReply=[...(snapshot.history||[])].reverse().find(item=>['assistant','operator'].includes(item.role))?.text||'';
  if(/[?¿]/.test(lastReply)&&/comprar|compra|pedido|resumen|confirmas|aceptas/i.test(lastReply))return false;
@@ -34,7 +35,7 @@ function informationFor(data){
  // Never cut a policy, price or number in the middle and present it as a complete fact.
  const records=data.knowledge.filter(item=>item.content.length<=2000).map(item=>({id:item.id,topic:item.topic,text:item.content}));
  if(records.length<40)records.push({id:'importados-branches',topic:'Sedes confirmadas',text:data.branches.map(branch=>[branch.name,branch.address,branch.hours?'Horario físico confirmado: '+branch.hours:'Horario físico pendiente de confirmar.'].join('. ')).join('\n')});
- if(records.length<40)records.push({id:'importados-commerce-limits',topic:'Confirmación humana de compras',text:'La existencia, reserva, costo de domicilio, cotización final y aprobación de pagos requieren confirmación del equipo. No hay reserva automática ni pedido creado desde este asistente. No afirmar que un producto está disponible sin confirmación vigente.'});
+ if(records.length<40)records.push({id:'importados-commerce-limits',topic:'Confirmación humana de compras',text:'Las existencias deben estar confirmadas hasta el cierre de hoy. El servidor controla la cotización, el resumen entregado y aceptado y la reserva. El equipo confirma cobertura, tarifa y pago antes de crear el pedido. Transferencia, Addi y Sistecrédito requieren validación; efectivo únicamente al recoger. Atención WhatsApp todos los días 9:00 a. m.–8:00 p. m., Colombia; domicilios hasta 7:00 p. m.'});
  for(const branch of data.branches.filter(item=>item.hours&&item.id===data.branch?.id))if(records.length<40)records.push({id:'hours-'+branch.id,topic:'Horario físico '+branch.name,text:branch.hours});
  return records.slice(0,40);
 }
@@ -47,30 +48,22 @@ export async function syntheticTurn(env,{text,branch_id}){
  const packet=snapshotPacket(state,{mode:'test'});packet.context_fingerprint=await digest(state);return packet;
 }
 export async function conversationTurn(env,conversationId){
- const [conversation]=await db(env,'whatsapp_conversations?id=eq.'+conversationId+'&select=*');
- if(!conversation)fail(404,'Conversación no encontrada.');
- const [messages,tasks,data]=await Promise.all([
-  db(env,'whatsapp_messages?conversation_id=eq.'+conversationId+'&created_at=gte.'+encodeURIComponent(conversation.session_started_at)+'&select=id,direction,source,kind,body,attachment,created_at&order=created_at.desc,id.desc&limit=60'),
-  db(env,'whatsapp_tasks?conversation_id=eq.'+conversationId+'&created_at=gte.'+encodeURIComponent(conversation.session_started_at)+'&select=id,branch_id,kind,question,latest_question,priority,revision,status,answer,source_message_id,created_at,updated_at&order=updated_at.desc,id&limit=100'),
-  resources(env,conversation.branch_id)
- ]);
- const latest=messages.find(item=>item.direction==='inbound');
+ const data=await rpc(env,'whatsapp_turn_snapshot',{p_conversation:conversationId});
+ const conversation=data?.conversation;if(!conversation)fail(404,'Conversación no encontrada.');
+ const messages=data.messages||[],tasks=data.tasks||[],latest=messages.find(m=>m.direction==='inbound');
  if(!latest)fail(409,'La conversación no tiene un mensaje entrante.');
+ const branch=data.branches.find(b=>b.id===conversation.branch_id)||null;
  const state={control:{manual_paused:conversation.manual_paused,closed:conversation.status==='closed',consent:conversation.consent_status,allow_ai:true},
-  branch:data.branch?{id:data.branch.id,name:data.branch.name}:null,message:{id:latest.id,text:latest.body,kind:latest.kind,...(latest.attachment?{attachment:{...latest.attachment,message_id:latest.id,persisted:latest.attachment.persisted===true}}:{})},
-  history:messages.slice().reverse().map(message=>({role:message.source==='customer'?'customer':message.source==='operator'?'operator':'assistant',text:message.body.length<=2000?message.body:'[Mensaje extenso conservado completo en la intranet; requiere revisión del equipo.]'})),
-  // Existing manual inventory has no count-valid-until or reservation semantics. Catalog
-  // metadata is deliberately withheld from commercial tools until that state exists.
-  products:[],information:informationFor(data),qr_assets:[],last_options:[],cart:[],operator_instructions:[],payment:{ready_for_qr:false,quote_id:''},checkout:{},order:null,
-  confirmed_answers:tasks.filter(task=>task.status==='resolved'&&task.branch_id===conversation.branch_id&&task.question.length<=800&&task.answer.length<=1800).slice(0,10).map(task=>({id:task.id,question:task.question,answer:task.answer})),
-  pending_tasks:tasks.filter(task=>task.status==='pending'&&task.branch_id===conversation.branch_id&&task.question.length<=800).slice(0,10).map(task=>({id:task.id,status:'pending',kind:task.kind,priority:task.priority||'normal',question:task.question,latest_question:task.latest_question?.slice(0,800)||'',revision:task.revision||0}))};
- const initial=messages.slice().reverse().find(message=>message.direction==='inbound'&&message.kind==='text'&&message.body.trim()&&!controlText(message.body));
- if(controlText(latest.body)&&initial&&initial.body.length<=2000&&!messages.some(m=>m.direction==='outbound'&&m.source==='assistant'&&!/^(Hola, somos Tiendas Importados\.|¿En qué sede quieres consultar\?)/.test(m.body)))state.onboarding_request=initial.body;
+ branch:branch?{id:branch.id,name:branch.name}:null,message:{id:latest.id,text:latest.body,kind:latest.kind,...(latest.attachment?{attachment:{...latest.attachment,message_id:latest.id,persisted:latest.attachment.persisted===true}}:{})},
+ history:messages.slice().reverse().map(m=>({role:m.source==='customer'?'customer':m.source==='operator'?'operator':'assistant',text:m.body.length<=2000?m.body:'[Mensaje extenso conservado en la intranet; requiere revisión del equipo.]'})),
+ information:informationFor({...data,branch}),operator_instructions:[],...commerceSnapshot(data),
+ confirmed_answers:tasks.filter(t=>t.status==='resolved'&&Date.parse(t.created_at)>=Date.parse(conversation.session_started_at)&&!t.review_type&&t.question.length<=800&&t.answer?.length<=1800).slice(0,10).map(t=>({id:t.id,question:t.question,answer:t.answer})),
+ pending_tasks:tasks.filter(t=>t.status==='pending'&&!t.review_type&&['human_request','missing_information','stock_check','pqrs'].includes(t.kind)&&t.question.length<=800).slice(0,10).map(t=>({id:t.id,status:t.status,kind:t.kind,priority:t.priority||'normal',question:t.question,latest_question:t.latest_question?.slice(0,800)||'',revision:t.revision||0,created_at:t.created_at})),
+ checkout_inputs:messages.filter(m=>m.direction==='inbound'&&Date.parse(m.created_at)>=Date.parse(data.checkout?.updated_at||conversation.session_started_at)).reverse().map(m=>({id:m.id,text:m.body,kind:m.kind}))};
+ state.onboarding_request=intakeRequest(state.history,latest.body);
  const packet=snapshotPacket(state,{conversationId,controlVersion:conversation.control_version,contextVersion:conversation.context_version,mode:'pilot',source:'intranet'});
- // Material resource versions participate in the fingerprint, including data withheld
- // from AI. An operator catalog edit therefore invalidates an in-flight proposal.
- packet.context_fingerprint=await digest({state,products:data.products,inventory:data.inventory,knowledge:data.knowledge,control:conversation.control_version,context:conversation.context_version});
- return {conversation,packet,latest,tasks};
+ packet.context_fingerprint=await digest({state,resourceVersion:data.resource_version,checkoutVersion:data.checkout?.version||0});
+ return {conversation,packet,latest,tasks,branches:data.branches,resourceVersion:data.resource_version,checkout:data.checkout};
 }
 export function validateDecision(data,packet){
  if(!data||data.contract!=='importados.bot.decision.v1'||data.status!=='decision_ready'||data.mode!==packet.mode||data.source!==packet.snapshot.source
@@ -105,13 +98,14 @@ export function validateDecision(data,packet){
   if(action.type==='propose_quote'&&(!Array.isArray(action.items)||!action.items.length||action.items.some(item=>!validProduct(item.product_id)||!Number.isSafeInteger(item.quantity)||item.quantity<1||item.quantity>99)))fail(502,'Referencias de cotización inválidas.');
   if(action.type==='propose_qr'&&(!packet.snapshot.payment.ready_for_qr||action.quote_id!==packet.snapshot.payment.quote_id||action.branch_id!==packet.snapshot.branch?.id||!packet.snapshot.qr_assets.some(asset=>asset.id===action.asset_id&&asset.active&&asset.branch_id===action.branch_id)))fail(502,'QR fuera de la cotización autorizada.');
  }
- if(decision.confirmed_item&&!packet.snapshot.confirmed_answers?.some(answer=>answer.id===decision.confirmed_item.source_task_id&&answer.answer.includes(decision.confirmed_item.source_excerpt)))fail(502,'Selección sin una fuente humana válida.');
- if(decision.accept_summary||decision.cancel_cart)fail(502,'La compra requiere gestión del equipo.');
+ if(decision.confirmed_item&&!packet.snapshot.confirmed_answers?.some(answer=>answer.id===decision.confirmed_item.source_task_id&&answer.answer.toLowerCase().includes(String(decision.confirmed_item.source_excerpt||'').toLowerCase())))fail(502,'Selección sin una fuente humana válida.');
+ if(decision.accept_summary&&!packet.snapshot.checkout.summary_delivered)fail(502,'Primero debe entregarse el resumen.');
+ if(decision.checkout&&Object.entries(decision.checkout).some(([k,v])=>!['customer_name','recipient_name','recipient_phone','fulfillment_type','delivery_address','delivery_zone','payment_method'].includes(k)||typeof v!=='string'||v.length>300))fail(502,'Datos de compra inválidos.');
  return data;
 }
 export async function callAssistant(env,packet){
  if(!env.N8N_WEBHOOK_SECRET||!validWorkflowUrl(env.N8N_BOT_WEBHOOK_URL))fail(503,'Falta conectar el motor privado de Importados.');
- let result;try{result=await fetch(env.N8N_BOT_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json','x-importados-webhook-secret':env.N8N_WEBHOOK_SECRET},body:JSON.stringify(packet),signal:AbortSignal.timeout(packet.mode==='pilot'?25000:100000)});}catch{fail(503,'El motor no respondió a tiempo. No se envió ningún mensaje.');}
+ let result;try{result=await fetch(env.N8N_BOT_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json','x-importados-webhook-secret':env.N8N_WEBHOOK_SECRET},body:JSON.stringify(packet),signal:AbortSignal.timeout(packet.mode==='pilot'?18000:100000)});}catch{fail(503,'El motor no respondió a tiempo. No se envió ningún mensaje.');}
  if(!result.ok)fail(503,'El motor privado no está disponible. No se envió ningún mensaje.');
  const raw=await result.text();if(raw.length>65536)fail(502,'La propuesta del motor es demasiado extensa.');
  let decision;try{decision=JSON.parse(raw);}catch{fail(502,'No pudimos leer la propuesta del motor.');}
@@ -137,25 +131,48 @@ export async function processInbox(env){
  try{
   context=await conversationTurn(env,claim.conversation_id);const c=context.conversation;context.requestId=claim.id;
   if(claim.kind==='human_resolution')await applyResolution(context,claim);
+  else if(claim.kind==='service_reopen'){if(claim.event?.reason==='consent_resume')context.requestId=context.latest.inbox_id||claim.id;if(claim.event?.message_id!==context.latest.id){await finish('superseded');return {processed:true};}}
   else{const [message]=await db(env,'whatsapp_messages?inbox_id=eq.'+claim.id+'&select=id&limit=1');
    if(message?.id!==context.latest.id){await finish('superseded');return {processed:true};}}
   if(c.manual_paused||c.status==='closed'||c.consent_status==='revoked'||Date.parse(c.last_customer_at)<=Date.now()-86400000){await finish('human_or_privacy_guard');return {processed:true};}
+  if(claim.kind==='message'&&context.latest.kind==='reaction'){await finish('quiet_reaction');return {processed:true,reason:'quiet_reaction'};}
   if(context.latest.body.length>4000)fail(409,'La consulta requiere revisión del equipo para conservar todo su contenido.');
   if(c.consent_status!=='granted'||c.consent_version!==cfg.privacy_version){
-   const notices=await db(env,'whatsapp_outbox?conversation_id=eq.'+c.id+'&purpose=eq.privacy_notice&status=in.(queued,sending,sent,delivered,read,uncertain)&select=id&limit=1');
-   if(!notices.length||c.consent_version!==cfg.privacy_version)await commitReply(env,context,'Hola, somos Tiendas Importados. GRUPO EMPRESARIAL ORIENTE SAS tratará los datos que compartas para atender consultas, compras y solicitudes por WhatsApp. Consulta las finalidades, tus derechos y cómo contactarnos en '+cfg.privacy_url+'. Si estás de acuerdo, responde YO ACEPTO. Puedes retirar la autorización escribiendo NO AUTORIZO.','privacy_notice');
+   const notices=await db(env,'whatsapp_outbox?conversation_id=eq.'+c.id+'&purpose=eq.privacy_notice&status=in.(sent,delivered,read,uncertain,sending,queued)&select=id,status,privacy_version&order=created_at.desc&limit=1');
+   if(!notices.length||notices[0].privacy_version!==cfg.privacy_version){
+    await commitReply(env,context,'Hola, soy el asistente virtual de Tiendas Importados. GRUPO EMPRESARIAL ORIENTE SAS tratará los datos que compartas para atender consultas, compras y solicitudes por WhatsApp. Consulta las finalidades, tus derechos y cómo contactarnos en '+cfg.privacy_url+'. Responde SÍ o ACEPTO si estás de acuerdo, o NO ACEPTO para finalizar la atención automatizada.'+(cfg.service_hours_enabled&&!serviceOpen().attention?' Atendemos de 9:00 a. m. a 8:00 p. m., hora de Colombia; podremos continuar cuando autorices el uso de tus datos y estemos en horario.':''),'privacy_notice');
+   }else if(['delivered','read'].includes(notices[0].status))await commitReply(env,context,'Para continuar, responde SÍ o ACEPTO si autorizas el uso de tus datos. Si no, responde NO ACEPTO. Política: '+cfg.privacy_url,'privacy_reminder');
    await finish('awaiting_consent');return {processed:true};
   }
+  if(cfg.service_hours_enabled&&!serviceOpen().attention){await rpc(env,'whatsapp_defer_service',{p_conversation:c.id,p_message:context.latest.id,p_control:c.control_version,p_context:c.context_version});await finish('outside_attention_hours');return {processed:true};}
+  if(asksBranches(context.latest.body)||asksChangeBranch(context.latest.body)){
+   await commitReply(env,context,branchMenu(context.branches),'reply');await finish('branch_menu');return {processed:true};
+  }
   const selection=selectedBranch(context.latest.body);
-  if(claim.kind!=='human_resolution'&&selection&&selection!==c.branch_id){await rpc(env,'whatsapp_select_branch',{p_conversation:c.id,p_message:context.latest.id,p_context:c.context_version,p_branch:selection});context=await conversationTurn(env,c.id);context.requestId=claim.id;}
+  const numericBranch=/^[12]$/.test(context.latest.body.trim());
+  const lastReply=[...context.packet.snapshot.history].reverse().find(m=>m.role==='assistant')?.text||'';
+  const branchMention=selection&&(!numericBranch||!c.branch_id||lastReply.includes('¿En qué sede'))&&(!c.branch_id||intakeControl(context.latest.body)||/\b(?:cambiar|cambio|pasar)\b.*\bsede\b/i.test(context.latest.body));
+  if(claim.kind!=='human_resolution'&&branchMention&&selection!==c.branch_id){await rpc(env,'whatsapp_select_branch',{p_conversation:c.id,p_message:context.latest.id,p_context:c.context_version,p_branch:selection});context=await conversationTurn(env,c.id);context.requestId=claim.id;}
   if(!context.conversation.branch_id){
-   await commitReply(env,context,'¿En qué sede quieres consultar?\n1. Santa Lucía · Medellín\n2. Niquía · Bello','branch_selection');await finish('awaiting_branch');return {processed:true};
+   await commitReply(env,context,(claim.kind==='service_reopen'?'Ya estamos atendiendo. ':'')+branchMenu(context.branches),'branch_selection');await finish('awaiting_branch');return {processed:true};
+  }
+  if(claim.kind==='human_resolution'&&claim.event?.checkout_review){
+   const task=context.tasks.find(t=>t.id===claim.event.task_id);
+   if(!task?.review_type){await finish('review_not_current');return {processed:true};}
+   if(task.review_result?.approved===false||task.review_type==='payment')await commitReply(env,context,task.answer,'reply');
+   else await commitCommerce(env,context,{intent:'checkout',checkout:{},quote:null,confirmed_item:null});
+   await finish('commerce_review_committed');return {processed:true};
   }
   if(claim.kind==='human_resolution'){
-   // The approved answer is sent verbatim. A slow/failed model cannot lose a price,
-   // negation or condition, or turn a response into another consultation.
-   await commitReply(env,context,context.packet.snapshot.human_resolution.answer,'reply');
-   await finish('approved_answer_committed');return {processed:true};
+   let answer=context.packet.snapshot.human_resolution.answer;
+   try{const decision=await callAssistant(env,context.packet);answer=approvedReply(context,decision.decision.reply_text);}catch{/* Literal approved answer preserves facts when generation fails. */}
+   const fresh=await conversationTurn(env,c.id);await applyResolution(fresh,claim);
+   if(fresh.packet.context_fingerprint!==context.packet.context_fingerprint){await finish('context_changed');return {processed:true};}
+   await commitReply(env,context,answer,'reply');await finish('approved_answer_committed');return {processed:true};
+  }
+  if(context.latest.attachment?.id&&context.latest.attachment.persisted!==true){await receiveIncomingMedia(env,context.latest.id);context=await conversationTurn(env,c.id);context.requestId=claim.id;}
+  if(['image','document'].includes(context.latest.kind)&&context.latest.attachment?.persisted===true&&context.packet.snapshot.checkout.accepted_quote_id&&context.packet.snapshot.checkout.stage!=='ordered'){
+   await commitCommerce(env,context,{intent:'checkout',checkout:{},quote:null,confirmed_item:null});await finish('receipt_review_committed');return {processed:true};
   }
   if(claim.kind!=='human_resolution'&&context.latest.kind!=='text'&&!context.latest.body){
    if(context.latest.attachment?.id)await receiveIncomingMedia(env,context.latest.id);
@@ -164,22 +181,23 @@ export async function processInbox(env){
    await commitReply(env,context,audio?'¿Me lo puedes escribir, por favor? Así seguimos con tu consulta.':'Recibimos tu archivo. Cuéntanos por escrito qué necesitas para que el equipo pueda revisar la consulta.','reply',audio?null:{kind:'missing_information',question:'El cliente envió un archivo de tipo '+context.latest.kind+'. Revisar el adjunto de este mensaje y confirmar su consulta.'});await finish('attachment_for_human');return {processed:true};
   }
   if(quietAcknowledgement(context.packet.snapshot)){await finish('quiet_acknowledgement');return {processed:true,reason:'quiet_acknowledgement'};}
-  const proposal=await callAssistant(env,context.packet);
+  const fixed=directConversationReply(context.packet);
+  const proposal=fixed?{decision:fixed}:await callAssistant(env,context.packet);
   const fresh=await conversationTurn(env,c.id);if(claim.kind==='human_resolution')await applyResolution(fresh,claim);
   if(fresh.packet.context_fingerprint!==context.packet.context_fingerprint){await finish('context_changed');return {processed:true};}
   const decision=proposal.decision;
-  const commercial=['quote','qr','checkout','order_status'].includes(decision.intent)||decision.quote||decision.offered_product_ids.length||decision.media_ids.length||decision.actions.some(action=>action.type!=='propose_human_task')||decision.confirmed_item||decision.accept_summary||decision.cancel_cart;
-  const taskAction=decision.actions.find(action=>action.type==='propose_human_task');
-  if(commercial){
-   await commitReply(env,context,'El equipo de la sede debe confirmar la disponibilidad y las condiciones de esta consulta. Dejamos tu solicitud pendiente de revisión.','reply',{kind:'missing_information',question:context.packet.snapshot.onboarding_request||context.latest.body||'Revisar solicitud comercial del cliente.'});
-  }else if(decision.reply_text.trim()){
-   await commitReply(env,context,decision.reply_text,'reply',taskAction?{kind:taskAction.reason,question:taskAction.question,task_id:taskAction.task_id||'',priority:taskAction.priority||'normal'}:null);
+  const taskAction=decision.actions?.find(action=>action.type==='propose_human_task');
+  if(hasCommerce(decision))await commitCommerce(env,context,decision);
+  else if(decision.reply_text.trim()){
+   if(decision.offered_product_ids?.length&&!taskAction)await rpc(env,'whatsapp_commit_options',{p_conversation:context.conversation.id,p_message:context.latest.id,p_control:context.conversation.control_version,p_context:context.conversation.context_version,p_resource:context.resourceVersion,p_request:context.requestId||context.latest.id,p_body:decision.reply_text,p_ids:decision.offered_product_ids});
+   else await commitReply(env,context,decision.reply_text,'reply',taskAction?{kind:taskAction.reason,question:taskAction.question,task_id:taskAction.task_id||'',priority:taskAction.priority||'normal'}:null);
   }
+  if(decision.media_ids?.length)await queueProductImages(env,context,decision.media_ids);
   await finish('proposal_committed');return {processed:true};
- }catch{
+ }catch(error){
   // No replay after an uncertain generation/commit. The durable inbound remains visible.
   if(context?.latest?.id)await rpc(env,'whatsapp_record_issue',{p_conversation:claim.conversation_id,p_message:context.latest.id,p_inbox:claim.id});
-  await finish('needs_operator_review');return {processed:true,reason:'needs_operator_review'};
+  await finish(error?.status===502?'invalid_model_decision':error?.status===503?'assistant_unavailable':'needs_operator_review');return {processed:true,reason:'needs_operator_review'};
  }
 }
 
@@ -194,10 +212,10 @@ export async function sendOne(env){
  // An HTTP error with a structured Meta rejection is definite; network/timeouts and
  // malformed successes are uncertain and must never be automatically retried.
  let media=null;
- if(claim.kind==='image'){try{media=await prepareOperatorImage(env,claim);}catch{await finish('failed',null,'media_upload_failed');return {sent:false,reason:'media_upload_failed'};}}
+ if(['image','document'].includes(claim.kind)){try{media=claim.bot_media?await prepareBotImage(env,claim):await prepareOperatorImage(env,claim);}catch{await finish('failed',null,'media_upload_failed');return {sent:false,reason:'media_upload_failed'};}}
  let response;
  try{
-  response=await fetch('https://graph.facebook.com/'+env.WHATSAPP_GRAPH_VERSION+'/'+env.WHATSAPP_PHONE_NUMBER_ID+'/messages',{method:'POST',headers:{Authorization:'Bearer '+env.WHATSAPP_ACCESS_TOKEN,'Content-Type':'application/json'},body:JSON.stringify({messaging_product:'whatsapp',recipient_type:'individual',...(isPhone?{to:claim.recipient}:{recipient:claim.recipient}),...(media?{type:'image',image:media}:{type:'text',text:{preview_url:false,body:claim.body}})}),signal:AbortSignal.timeout(media?10000:15000)});
+  response=await fetch('https://graph.facebook.com/'+env.WHATSAPP_GRAPH_VERSION+'/'+env.WHATSAPP_PHONE_NUMBER_ID+'/messages',{method:'POST',headers:{Authorization:'Bearer '+env.WHATSAPP_ACCESS_TOKEN,'Content-Type':'application/json'},body:JSON.stringify({messaging_product:'whatsapp',recipient_type:'individual',...(isPhone?{to:claim.recipient}:{recipient:claim.recipient}),...(media?{type:claim.kind,[claim.kind]:media}:{type:'text',text:{preview_url:false,body:claim.body}})}),signal:AbortSignal.timeout(8000)});
  }catch{await finish('uncertain',null,'network_outcome_unknown');return {sent:false,reason:'uncertain'};}
  let result;try{result=await response.json();}catch{await finish('uncertain',null,'provider_outcome_unknown');return {sent:false,reason:'uncertain'};}
  if(!response.ok){const definite=typeof result?.error?.code==='number'&&response.status>=400&&response.status<500;await finish(definite?'failed':'uncertain',null,definite?'provider_rejected':'provider_outcome_unknown');return {sent:false,reason:definite?'failed':'uncertain'};}
@@ -210,7 +228,9 @@ export async function runWhatsAppJobs(env){
  const started=Date.now();
  // Existing durable deliveries take priority. Slow generation can leave its new
  // reply queued for the next invocation instead of starting Meta near the 30s cutoff.
- const pending=await sendOne(env);if(pending.sent||pending.reason!=='empty')return;
+ const pending=await sendOne(env);if(pending.reason==='uncertain'||Date.now()-started>7000)return;
+ await rpc(env,'whatsapp_prepare_reopening');
  await processInbox(env);
- if(Date.now()-started<11000)await sendOne(env);
+ if(Date.now()-started<19000)await sendOne(env);
+ if(Date.now()-started<8000)await sendOne(env);
 }

@@ -1,5 +1,7 @@
 # WhatsApp: n8n e intranet de Importados
 
+Registro histórico de octubre20/21. El alcance comercial y el número fueron ampliados posteriormente: ver `BOT_PARITY_20261029.md` y `whatsapp-cambio-numero-2026-10-26.md`. Las limitaciones iniciales de este documento no describen la versión actual.
+
 Trabajo autorizado por Samuel el 20 de octubre de 2026 mientras se resuelve el registro del número real en Meta. Este registro distingue preparación, pruebas sintéticas y atención pública. No se envían mensajes de prueba a clientes.
 
 ## Recursos propios

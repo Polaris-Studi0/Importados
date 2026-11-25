@@ -18,6 +18,7 @@ async function incoming(phone,text,extra={}){return rpc('whatsapp_receive_event'
 async function conversation(id){return (await db.query('select * from public.whatsapp_conversations where id=$1',[id])).rows[0];}
 async function action(id,name,payload={},request=randomUUID(),expected){const c=await conversation(id);return rpc('whatsapp_staff_action',[ids.admin,id,name,request,expected??c.control_version,JSON.stringify(payload)]);}
 async function authorize(initial,phone,acceptance='YO ACEPTO'){
+ await db.exec("update public.whatsapp_outbox set status='cancelled' where status='queued'");
  const c=await conversation(initial.conversation_id);const meta='wamid.synthetic.auth.'+randomUUID();
  const queued=await rpc('whatsapp_commit_reply',[c.id,initial.message_id,c.control_version,c.context_version,randomUUID(),'Aviso sintético https://tiendasimportados.com/privacidad-prueba-sintetica','privacy_notice',null]);
  const claim=await rpc('whatsapp_claim_outbox');assert.equal(claim.id,queued.outbox_id);
@@ -42,6 +43,7 @@ before(async()=>{
  const receiptCorrection=await readFile(new URL('../supabase/202610210001_whatsapp_privacy_receipts.sql',import.meta.url),'utf8');await db.exec(receiptCorrection);await db.exec(receiptCorrection);
  const operator=await readFile(new URL('../supabase/202610210002_whatsapp_operator_media_alerts.sql',import.meta.url),'utf8');await db.exec(operator);await db.exec(operator);
  const attention=await readFile(new URL('../supabase/202610270001_whatsapp_attention_attachments.sql',import.meta.url),'utf8');await db.exec(attention);await db.exec(attention);
+ for(const name of ['202610290001_whatsapp_commerce.sql','202610290002_whatsapp_reviews_hours.sql','202610290003_whatsapp_intake_guards.sql','202610290004_whatsapp_media.sql','202610290005_whatsapp_options.sql','202610290006_whatsapp_consent_resume.sql','202610290007_whatsapp_order_reference.sql','202610290008_whatsapp_payment_continuity.sql']){const sql=await readFile(new URL('../supabase/'+name,import.meta.url),'utf8');await db.exec(sql);await db.exec(sql);}
  for(const id of Object.values(ids))await db.query('insert into auth.users(id) values($1)',[id]);
  await db.query(`insert into public.profiles(id,full_name,role,branch_id,active) values
  ($1,'Admin sintético','admin',null,true),($2,'Caja Santa sintética','cashier','santa-lucia',true),
@@ -125,7 +127,7 @@ test('outbound has one attempt and an uncertain delivery can never be claimed ag
  await assert.rejects(action(c.id,'send',{text:'Fuera de ventana'}),/ventana vigente/);
 });
 test('resolved tasks create one durable follow-up, held during takeover and available after resume',async()=>{
- await db.exec("update public.whatsapp_inbox set state='processed' where kind='message'");
+ await db.exec("update public.whatsapp_inbox set state='processed' where kind in ('message','service_reopen')");
  const initial=await incoming('573000000012');await db.query("update public.whatsapp_conversations set branch_id='santa-lucia',consent_status='granted',consent_version='synthetic-v1' where id=$1",[initial.conversation_id]);
  await db.query("update public.whatsapp_inbox set state='processed' where id=$1",[initial.inbox_id]);
  const task=(await db.query("insert into public.whatsapp_tasks(conversation_id,branch_id,kind,question,source_message_id,dedupe_key) values($1,'santa-lucia','stock_check','¿Precio sintético?',$2,'test') returning id",[initial.conversation_id,initial.message_id])).rows[0];
@@ -137,9 +139,10 @@ test('resolved tasks create one durable follow-up, held during takeover and avai
  assert.equal((await db.query("select count(*)::int as n from public.whatsapp_inbox where kind='human_resolution' and conversation_id=$1",[c.id])).rows[0].n,1);
 });
 test('generation failures create a visible idempotent human task without fabricating delivery',async()=>{
- const c=await incoming('573000000013');await rpc('whatsapp_record_issue',[c.conversation_id,c.message_id,c.inbox_id]);await rpc('whatsapp_record_issue',[c.conversation_id,c.message_id,c.inbox_id]);
+ const first=await incoming('573000000013');await authorize(first,'573000000013');const c=await incoming('573000000013','Consulta para revisión');await rpc('whatsapp_record_issue',[c.conversation_id,c.message_id,c.inbox_id]);await rpc('whatsapp_record_issue',[c.conversation_id,c.message_id,c.inbox_id]);
  const tasks=(await db.query('select * from public.whatsapp_tasks where conversation_id=$1',[c.conversation_id])).rows;assert.equal(tasks.length,1);assert.equal(tasks[0].status,'pending');
- assert.equal((await db.query('select count(*)::int as n from public.whatsapp_outbox where conversation_id=$1',[c.conversation_id])).rows[0].n,0);
+ assert.equal((await db.query("select count(*)::int as n from public.whatsapp_outbox where conversation_id=$1 and status='queued'",[c.conversation_id])).rows[0].n,1);
+ await db.query("update public.whatsapp_outbox set status='cancelled' where conversation_id=$1 and status='queued'",[c.conversation_id]);
 });
 test('late privacy receipts cannot authorize a replacement version or restore a revoked notice',async()=>{
  const initial=await incoming('573000000014','Consulta sintética');let c=await conversation(initial.conversation_id);
@@ -174,7 +177,7 @@ test('operator photo is scoped, requires takeover and authorization, and commits
 });
 test('new human requests queue one alert and wait for a session or approved template without sending twice',async()=>{
  await db.exec("update public.whatsapp_operator_alerts set status='cancelled' where status='queued'");
- const c=await incoming('573000000016');await rpc('whatsapp_record_issue',[c.conversation_id,c.message_id,c.inbox_id]);await rpc('whatsapp_record_issue',[c.conversation_id,c.message_id,c.inbox_id]);
+ const first=await incoming('573000000016');await authorize(first,'573000000016');const c=await incoming('573000000016','Consulta para revisión');await rpc('whatsapp_record_issue',[c.conversation_id,c.message_id,c.inbox_id]);await rpc('whatsapp_record_issue',[c.conversation_id,c.message_id,c.inbox_id]);
  assert.equal((await db.query("select count(*)::int as n from public.whatsapp_operator_alerts where status='queued'")).rows[0].n,1);
  assert.equal(await rpc('whatsapp_claim_operator_alert',[false,false]),null);
  const claim=await rpc('whatsapp_claim_operator_alert',[false,true]);assert.equal(claim.use_template,true);
